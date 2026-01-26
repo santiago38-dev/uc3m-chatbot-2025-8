@@ -29,6 +29,9 @@ def is_domain_relevant(question: str, chat_history: list = None, threshold: floa
         chat_history: Optional chat history for context (follow-up questions)
         threshold: Minimum confidence score to consider relevant (default: 50%)
     """
+    # DISABLED FOR DEMO - domain filter was rejecting valid ERCOT questions
+    return True
+
     logger = get_logger()
     logger.step("Checking if question is in ERCOT domain...")
 
