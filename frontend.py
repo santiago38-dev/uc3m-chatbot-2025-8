@@ -490,24 +490,8 @@ if user_text:
                 "I can only answer questions about energy projects" in full.lower()
             )
 
-            # Debug: log detection status
-            if is_out_of_scope:
-                st.caption("🔍 Out-of-scope question detected - skipping topic suggestions")
-
-            if not is_out_of_scope:
-                try:
-                    # Detect language for multilingual topic suggestions
-                    query_lang = detect_language(user_text)
-
-                    topic_model = load_topic_model()
-                    topics_chunks = topics_from_retrieved_chunks(topic_model, retriever, user_text, top_n=3)
-                    topics_query = top_topics_for_query(topic_model, user_text, top_n=3)
-                    topics = merge_intent_and_grounded_topics(topics_query, topics_chunks, top_n=3)
-                    questions = suggest_questions_from_topics(topics, n=5, lang=query_lang)
-
-                except Exception as e:
-                    # Optional: show a tiny debug message
-                    st.caption(f"Topic suggestions unavailable: {e}")
+            # BERTopic suggestions disabled for demo
+            # (requires local model file and causes errors without it)
 
             formatted_full = keep_only_last_sources(full)
 
