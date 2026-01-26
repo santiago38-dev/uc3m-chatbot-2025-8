@@ -4,7 +4,11 @@ import re
 import tempfile
 import traceback
 import uuid
+import warnings
 from pathlib import Path
+
+# Suppress deprecation warnings for cleaner demo
+warnings.filterwarnings("ignore")
 
 import streamlit as st
 
@@ -86,7 +90,7 @@ def show_document(project, inr, section):
     st.markdown(html, unsafe_allow_html=True)
 
 
-st.set_page_config(page_title="UC3M RAG Chatbot", page_icon="💬", layout="centered")
+st.set_page_config(page_title="SGIA Intelligence", page_icon="⚡", layout="centered")
 
 
 def file_hash(path: str) -> str:
@@ -112,8 +116,8 @@ def load_chain(k_docs: int, mode: str, with_summary: bool):
     return chain, retriever
 
 
-st.title("⚡ ERCOT Projects Chatbot")
-st.caption("Electric Reliability Council of Texas")
+st.title("⚡ SGIA Intelligence")
+st.caption("133 Texas Interconnection Agreements • Instant Analysis")
 
 
 def keep_only_last_sources(text: str) -> str:
