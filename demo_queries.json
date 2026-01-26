@@ -1,0 +1,68 @@
+{
+  "queries": [
+    {
+      "id": "Q1",
+      "query": "Compare RWE's security deposits to the corpus median. Are they paying above or below market?"
+    },
+    {
+      "id": "Q2",
+      "query": "Which parent companies in this corpus have projects in multiple ERCOT zones?"
+    },
+    {
+      "id": "Q3",
+      "query": "Identify projects in COAST zone that have amendments. What might this indicate?"
+    },
+    {
+      "id": "Q4",
+      "query": "What termination rights does the Transmission Service Provider reserve in these agreements?"
+    },
+    {
+      "id": "Q5",
+      "query": "Compare the force majeure provisions in Centerpoint TSP agreements versus ONCOR agreements."
+    },
+    {
+      "id": "Q6",
+      "query": "What cure periods are specified for payment defaults? Is there variation by TSP?"
+    },
+    {
+      "id": "Q7",
+      "query": "What are the liability limitations that apply to ERCOT in these interconnection agreements?"
+    },
+    {
+      "id": "Q8",
+      "query": "What's the range of security deposits per kW for battery storage projects? How does this compare to solar?"
+    },
+    {
+      "id": "Q9",
+      "query": "Which projects have security amounts above $100/kW? What might explain these outliers?"
+    },
+    {
+      "id": "Q10",
+      "query": "Rank the TSPs by average security requirement per kW. Which appears most expensive?"
+    },
+    {
+      "id": "Q11",
+      "query": "If evaluating a developer for acquisition, which parent companies have the most diversified technology portfolios?"
+    },
+    {
+      "id": "Q12",
+      "query": "What geographic concentration patterns do you see? Which counties have the most projects?"
+    },
+    {
+      "id": "Q13",
+      "query": "What are the key terms of the Houston IV BESS interconnection agreement?"
+    },
+    {
+      "id": "Q14",
+      "query": "Compare Peyton Creek Wind II (RWE) to Parliament Solar. What are the key differences?"
+    },
+    {
+      "id": "Q15",
+      "query": "What unusual clauses appear in any agreements that a developer should be concerned about?"
+    },
+    {
+      "id": "Q16",
+      "query": "Predict which developers are likely to experience delays based on their agreement terms."
+    }
+  ]
+}
