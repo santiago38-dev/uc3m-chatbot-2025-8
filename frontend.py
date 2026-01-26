@@ -146,7 +146,7 @@ def keep_only_last_sources(text: str) -> str:
 # Sidebar: Settings + Upload
 # -------------------------
 with st.sidebar:
-    logo_path = Path(__file__).parent / "ERCOT-logo-1-1779176074.webp"
+    logo_path = Path(__file__).parent / "ercot_image.png"
     if logo_path.exists():
         st.image(str(logo_path), use_container_width=True)
     else:
