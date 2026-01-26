@@ -329,7 +329,7 @@ def render_message_structurally(content: str, msg_index: int, topics: list = Non
 
     # 2. Sources (Expander with Buttons)
     if sources_content:
-        with st.expander("📚 Sources / Fuentes"):
+        with st.expander("📚 Sources"):
             # Split lines and render buttons
             lines = sources_content.strip().split('\n')
             for idx, line in enumerate(lines):
