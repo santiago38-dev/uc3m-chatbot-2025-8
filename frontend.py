@@ -148,7 +148,7 @@ def keep_only_last_sources(text: str) -> str:
 with st.sidebar:
     logo_path = Path(__file__).parent / "ERCOT-logo-1-1779176074.webp"
     if logo_path.exists():
-        st.image(str(logo_path), use_column_width=True)
+        st.image(str(logo_path), use_container_width=True)
     else:
         st.warning("Logo not found")
 
