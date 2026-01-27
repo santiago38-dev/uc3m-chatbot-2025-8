@@ -65,6 +65,13 @@ RULES:
 - Do NOT hallucinate specific numbers, dates, or names not in the context
 - NEVER attribute a project to a developer unless the source metadata explicitly confirms it
 
+DEDUPLICATION & CONCISENESS:
+- Do NOT list the same project multiple times in your response
+- For pattern/policy questions (e.g., "What are typical cure periods?"), synthesize the answer WITHOUT listing every source project individually
+- Only list individual projects when the question SPECIFICALLY asks for a list (e.g., "List all battery projects")
+- When answering about standard terms, clauses, or policies: state the pattern/policy first, then cite representative sources (e.g., "The typical cure period is 30 days [Source 1, 5, 8]")
+- Avoid redundant preambles - get to the answer directly
+
 Context:
 {context}"""
 
@@ -153,6 +160,13 @@ REGLAS:
 - NO incluyas meta-comentarios sobre lo que eliminaste o cambiaste
 - NO inventes números, fechas o nombres específicos que no estén en el contexto
 - NUNCA atribuyas un proyecto a un desarrollador a menos que los metadatos de la fuente lo confirmen explícitamente
+
+DEDUPLICACIÓN Y CONCISIÓN:
+- NO listes el mismo proyecto múltiples veces en tu respuesta
+- Para preguntas sobre patrones/políticas (ej: "¿Cuáles son los períodos de cura típicos?"), sintetiza la respuesta SIN listar cada proyecto fuente individualmente
+- Solo lista proyectos individuales cuando la pregunta ESPECÍFICAMENTE pida una lista (ej: "Lista todos los proyectos de baterías")
+- Al responder sobre términos, cláusulas o políticas estándar: indica el patrón/política primero, luego cita fuentes representativas (ej: "El período de cura típico es 30 días [Fuente 1, 5, 8]")
+- Evita preámbulos redundantes - ve directamente a la respuesta
 
 Contexto:
 {context}"""
@@ -310,17 +324,19 @@ Formato ejemplo:
     "LISTING": {
         "en": """RESPONSE FORMAT FOR LISTING QUESTION:
 1. State the total count first (e.g., "There are X projects:")
-2. Present items as a numbered or bulleted list
+2. Present items as a numbered or bulleted list - EACH ITEM ONLY ONCE
 3. For each item, include key identifiers (name, INR, type)
 4. Group by category if applicable (by developer, technology, zone)
-5. Cite sources for each item""",
+5. Cite sources for each item
+IMPORTANT: Never list the same project/item multiple times. Deduplicate by project name/INR.""",
 
         "es": """FORMATO PARA PREGUNTA DE LISTADO:
 1. Indica el conteo total primero (ej: "Hay X proyectos:")
-2. Presenta elementos como lista numerada o con viñetas
+2. Presenta elementos como lista numerada o con viñetas - CADA ELEMENTO SOLO UNA VEZ
 3. Para cada elemento, incluye identificadores clave (nombre, INR, tipo)
 4. Agrupa por categoría si aplica (por desarrollador, tecnología, zona)
-5. Cita fuentes para cada elemento"""
+5. Cita fuentes para cada elemento
+IMPORTANTE: Nunca listes el mismo proyecto/elemento múltiples veces. Deduplica por nombre de proyecto/INR."""
     },
 
     "TEMPORAL": {
@@ -359,16 +375,20 @@ Formato ejemplo:
 
     "GENERAL": {
         "en": """RESPONSE FORMAT FOR GENERAL QUESTION:
-1. Address the question directly
+1. Address the question directly - state the key finding/answer first
 2. Structure information logically with headers if needed
 3. Include relevant data with citations
-4. Be comprehensive but concise""",
+4. Be comprehensive but concise
+5. For pattern/policy questions, synthesize the answer rather than listing every source project
+IMPORTANT: Do not list individual projects unless specifically asked. Focus on answering the question directly.""",
 
         "es": """FORMATO PARA PREGUNTA GENERAL:
-1. Aborda la pregunta directamente
+1. Aborda la pregunta directamente - indica el hallazgo/respuesta clave primero
 2. Estructura la información lógicamente con encabezados si es necesario
 3. Incluye datos relevantes con citas
-4. Sé completo pero conciso"""
+4. Sé completo pero conciso
+5. Para preguntas sobre patrones/políticas, sintetiza la respuesta en lugar de listar cada proyecto fuente
+IMPORTANTE: No listes proyectos individuales a menos que se pida específicamente. Enfócate en responder la pregunta directamente."""
     }
 }
 

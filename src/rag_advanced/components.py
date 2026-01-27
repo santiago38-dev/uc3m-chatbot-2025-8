@@ -754,7 +754,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     from .attribution_validator import (
         check_missing_entities,
         generate_attribution_warning,
-        get_developers_in_docs
+        get_entities_in_docs
     )
 
     logger = get_logger()
@@ -830,20 +830,26 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         all_docs = all_docs[:max_docs]
 
     # === CHECK FOR MISSING ENTITIES ===
+    # Fixed: Use entity_type to correctly detect TSPs vs developers (fixes Q3 ONCOR warning bug)
     missing_warning = None
     if is_comparative:
         requested_entities = []
+        entity_type = 'parent_company'  # Default
+
         if isinstance(extracted_filters.get('parent_company'), list):
             requested_entities = extracted_filters['parent_company']
+            entity_type = 'parent_company'
         elif isinstance(extracted_filters.get('tsp_normalized'), list):
             requested_entities = extracted_filters['tsp_normalized']
+            entity_type = 'tsp_normalized'
 
         if requested_entities:
-            found_entities = get_developers_in_docs(all_docs)
-            missing = check_missing_entities(requested_entities, all_docs)
+            # Use entity-type-aware function for proper TSP vs developer detection
+            found_entities = get_entities_in_docs(all_docs, entity_type)
+            missing = check_missing_entities(requested_entities, all_docs, entity_type)
             if missing:
                 missing_warning = generate_attribution_warning(missing, found_entities, lang)
-                logger.warning(f"Missing entities in results: {missing}")
+                logger.warning(f"Missing {entity_type} entities in results: {missing}")
 
     # 7. Format sources for response
     retrieval = format_sources(all_docs)
