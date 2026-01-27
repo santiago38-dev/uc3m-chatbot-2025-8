@@ -62,8 +62,8 @@ class RAGQualityEvaluator:
         meta = doc.metadata
         project = meta.get('project_name', 'Unknown')
         inr = meta.get('inr', 'N/A')
-        # Use section_type first (primary field), fall back to section
-        section = meta.get('section_type') or meta.get('section', 'N/A')
+        # Use section (actual section ID like article_1), fall back to section_type
+        section = meta.get('section') or meta.get('section_type', 'N/A')
         return f"{project}::{inr}::{section}"
 
     @staticmethod

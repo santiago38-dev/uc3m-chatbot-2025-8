@@ -383,7 +383,7 @@ def get_document_content(project_name: str, inr: str, section: str) -> str:
             "$and": [
                 {"project_name": {"$eq": project_name}},
                 {"inr": {"$eq": inr}},
-                {"section_type": {"$eq": section}}  # ChromaDB uses section_type, not section
+                {"section": {"$eq": section}}  # Use section (article_1, exhibit_c, etc.)
             ]
         }
 

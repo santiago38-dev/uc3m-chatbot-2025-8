@@ -157,8 +157,8 @@ def deduplicate_docs_by_inr(
         if meta.get('nameplate_capacity_mw') or meta.get('capacity_mw'):
             score += 5
 
-        # Prefer certain section types
-        section = str(meta.get('section_type', '') or meta.get('section', '')).lower()
+        # Prefer certain section types (use section like article_1, exhibit_c)
+        section = str(meta.get('section', '') or meta.get('section_type', '')).lower()
         if 'schedule' in section:
             score += 5
         if 'exhibit' in section:
