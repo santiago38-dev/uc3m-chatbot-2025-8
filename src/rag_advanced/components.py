@@ -659,8 +659,8 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     Flow: Classify → Extract Metadata → Expand queries → Retrieve → Dedupe → Generate → Validate
     Note: Domain guardrail is checked in thinking_generator before this is called.
     """
-    # Import here to avoid circular imports
-    from src.vector_store import build_chromadb_where_clause
+    # Import from filter_utils to avoid circular imports
+    from .filter_utils import build_chromadb_where_clause
     from .attribution_validator import (
         check_missing_entities,
         generate_attribution_warning,
