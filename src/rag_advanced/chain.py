@@ -294,12 +294,97 @@ def get_context_for_query(
 
 # --- Chain Builders ---
 
+def execute_retrieval(
+    query: str,
+    retriever,
+    query_type: str,
+    analytics_path: str,
+    k_total: Optional[int] = None,
+    filter_hook: Optional[callable] = None
+) -> Tuple[str, List, Dict]:
+    """
+    Execute retrieval based on query type with optional filter hook.
+
+    This function provides a clean extension point for hallucination guard
+    and hard filter integration.
+
+    Args:
+        query: The user's question
+        retriever: Document retriever
+        query_type: "aggregation", "retrieval", or "hybrid"
+        analytics_path: Path to analytics JSON
+        k_total: Max documents to retrieve
+        filter_hook: Optional callable(query, retriever) -> (docs, abort_msg)
+                    Returns (docs, None) for normal retrieval
+                    Returns ([], abort_msg) to abort with message
+
+    Returns:
+        Tuple of (context, docs, retrieval_dict)
+    """
+    logger = get_logger()
+
+    # --- AGGREGATION PATH: Skip retrieval entirely ---
+    if query_type == "aggregation":
+        analytics = load_analytics(analytics_path)
+        if analytics:
+            context = get_analytics_context(analytics)
+            logger.success("Using pre-computed corpus analytics")
+            retrieval = {
+                "context": context,
+                "has_docs": True,
+                "sources": []
+            }
+            return context, [], retrieval
+        else:
+            logger.warning("Analytics unavailable, falling back to retrieval")
+            query_type = "retrieval"  # Fallback
+
+    # --- RETRIEVAL PATH: Apply filter hook if provided ---
+    docs = []
+    abort_msg = None
+
+    if filter_hook is not None:
+        # Extension point for hallucination guard / hard filters
+        docs, abort_msg = filter_hook(query, retriever)
+        if abort_msg:
+            # Filter hook wants to abort (e.g., entity doesn't exist)
+            return abort_msg, [], {"context": abort_msg, "has_docs": False, "sources": []}
+    else:
+        # Standard retrieval
+        docs = retriever.invoke(query)
+
+    retrieval = format_sources(docs, max_sources=k_total)
+
+    # --- HYBRID PATH: Merge analytics with retrieval ---
+    if query_type == "hybrid":
+        analytics = load_analytics(analytics_path)
+        if analytics:
+            analytics_context = get_analytics_context(analytics)
+            context = f"""## CORPUS-WIDE STATISTICS
+{analytics_context}
+
+## RELEVANT DOCUMENT EXCERPTS
+{retrieval['context']}
+"""
+            retrieval["context"] = context
+            logger.success("Using hybrid mode: analytics + document retrieval")
+        else:
+            context = retrieval["context"]
+            logger.warning("Analytics unavailable for hybrid mode")
+    else:
+        context = retrieval["context"]
+        logger.success("Using document retrieval")
+
+    return context, docs, retrieval
+
+
 def get_flash_chain(
     retriever,
     k_total: Optional[int] = None,
     with_history: bool = True,
     with_summary: bool = False,
-    analytics_path: str = DEFAULT_ANALYTICS_PATH
+    analytics_path: str = DEFAULT_ANALYTICS_PATH,
+    filter_hook: Optional[callable] = None
 ) -> Union[RunnableWithMessageHistory, RunnableLambda]:
     """Build Flash mode RAG chain (fast, 2-4 LLM calls with decomposition).
 
@@ -309,6 +394,8 @@ def get_flash_chain(
         with_history: Whether to include chat history management
         with_summary: Whether to append document summary
         analytics_path: Path to pre-computed analytics JSON
+        filter_hook: Optional callable for hallucination guard / hard filter integration
+                    Signature: (query, retriever) -> (docs, abort_msg_or_none)
 
     Returns:
         RAG chain runnable (with or without history wrapper)
@@ -316,40 +403,48 @@ def get_flash_chain(
     get_logger().info("Building FLASH mode chain (analytics-aware)")
 
     def flash_with_domain_filter(input_dict: Dict) -> Generator[str, None, None]:
-        """Flash generator with domain pre-filter and analytics routing."""
+        """Flash generator with domain pre-filter and analytics routing.
+
+        Pipeline flow:
+        1. Domain filter (out-of-scope rejection)
+        2. Query classification (aggregation vs retrieval vs hybrid)
+        3. Aggregation path → analytics JSON (skip retrieval)
+        4. Retrieval path → filter_hook (if provided) → ChromaDB
+        5. Hybrid path → both analytics + retrieval
+        6. Response generation
+        """
         logger = get_logger()
         question = input_dict["question"]
         history = input_dict.get("chat_history", [])
         lang = detect_language(question)
 
-        # Domain pre-filter: skip retrieval for out-of-scope questions
+        # --- STEP 1: Domain pre-filter ---
         if not is_domain_relevant(question, history):
             msg = OOS_QUESTION_MSG[lang]
             yield msg
             return
 
-        # Get context based on query classification (analytics vs retrieval vs hybrid)
-        context, docs, query_type = get_context_for_query(question, retriever, analytics_path)
+        # --- STEP 2: Query classification ---
+        query_type = classify_query(question)
+        logger.info(f"Query classified as: {query_type}")
 
-        # Store query_type in input_dict for downstream access
-        input_dict["_query_type"] = query_type
+        # --- STEPS 3-5: Execute retrieval based on query type ---
+        context, docs, retrieval = execute_retrieval(
+            query=question,
+            retriever=retriever,
+            query_type=query_type,
+            analytics_path=analytics_path,
+            k_total=k_total,
+            filter_hook=filter_hook
+        )
 
-        # Build retrieval dict for generate_flash_response
-        if query_type == "aggregation":
-            # For pure aggregation, use analytics context directly
-            retrieval = {
-                "context": context,
-                "has_docs": True,  # Analytics counts as having data
-                "sources": []
-            }
-        else:
-            # For retrieval or hybrid, format sources normally
-            retrieval = format_sources(docs, max_sources=k_total)
-            if query_type == "hybrid":
-                # Prepend analytics context to retrieval context
-                retrieval["context"] = context
+        # Check if filter_hook aborted the request
+        if not retrieval.get("has_docs", True) and query_type != "aggregation":
+            # Aborted by filter hook (e.g., hallucination guard)
+            yield context  # context contains the abort message
+            return
 
-        # Generate response
+        # --- STEP 6: Generate response ---
         for chunk in generate_flash_response({
             "question": question,
             "retrieval": retrieval,
@@ -381,7 +476,8 @@ def get_thinking_chain(
     k_total: int = None,
     with_history: bool = True,
     with_summary: bool = False,
-    analytics_path: str = DEFAULT_ANALYTICS_PATH
+    analytics_path: str = DEFAULT_ANALYTICS_PATH,
+    filter_hook: Optional[callable] = None
 ):
     """Build Thinking mode RAG chain (deep verification, 5-10 LLM calls).
 
@@ -391,28 +487,36 @@ def get_thinking_chain(
         with_history: Whether to include chat history management
         with_summary: Whether to append document summary
         analytics_path: Path to pre-computed analytics JSON
+        filter_hook: Optional callable for hallucination guard / hard filter integration
     """
     get_logger().info("Building THINKING mode chain (analytics-aware)")
 
     def thinking_generator(input_iter):
-        """Generator function for RunnableGenerator - yields chunks from thinking response."""
+        """Generator function for RunnableGenerator - yields chunks from thinking response.
+
+        Pipeline flow:
+        1. Domain filter (out-of-scope rejection)
+        2. Query classification (aggregation vs retrieval vs hybrid)
+        3. Question contextualization (chat history)
+        4. Thinking response generation (multi-step verification)
+        """
         logger = get_logger()
         for input_dict in input_iter:
             question = input_dict.get("question", "")
             lang = detect_language(question)
 
-            # Domain guardrail FIRST - before any LLM calls (with chat context)
+            # --- STEP 1: Domain guardrail ---
             history = input_dict.get("chat_history", [])
             if not is_domain_relevant(question, history):
                 msg = OOS_QUESTION_MSG[lang]
                 yield msg
                 return
 
-            # Classify query for analytics routing
+            # --- STEP 2: Query classification ---
             query_type = classify_query(question)
             logger.info(f"Query classified as: {query_type}")
 
-            # Contextualize question (only if relevant)
+            # --- STEP 3: Contextualize question ---
             if input_dict.get("chat_history"):
                 logger.step("Reformulating question based on chat history...")
                 prompt_val = REPHRASE_PROMPT.invoke(input_dict)
@@ -420,15 +524,16 @@ def get_thinking_chain(
                 logger.success(f"Reformulated: {question[:50]}...")
                 input_dict = {**input_dict, "question": question}
 
-            # Pass summary option and query type to thinking response
+            # Pass options to thinking response
             input_dict = {
                 **input_dict,
                 "with_summary": with_summary,
                 "_query_type": query_type,
-                "_analytics_path": analytics_path
+                "_analytics_path": analytics_path,
+                "_filter_hook": filter_hook
             }
 
-            # Generate thinking response
+            # --- STEP 4: Generate thinking response ---
             for chunk in generate_thinking_response(input_dict, retriever, k_total=k_total):
                 yield chunk
 
@@ -450,7 +555,8 @@ def get_rag_chain(
     k_total: int = None,
     with_history: bool = True,
     with_summary: bool = False,
-    analytics_path: str = DEFAULT_ANALYTICS_PATH
+    analytics_path: str = DEFAULT_ANALYTICS_PATH,
+    filter_hook: Optional[callable] = None
 ):
     """Get RAG chain with specified mode.
 
@@ -461,6 +567,18 @@ def get_rag_chain(
         with_history: Whether to include chat history management
         with_summary: Whether to append document summary to responses
         analytics_path: Path to pre-computed analytics JSON
+        filter_hook: Optional callable for hallucination guard / hard filter integration
+                    Signature: (query, retriever) -> (docs, abort_msg_or_none)
+
+    Example filter_hook for hallucination guard:
+        def hallucination_guard_hook(query, retriever):
+            extracted_filters = extract_query_filters(query)
+            if extracted_filters.equality_filters:
+                entity_check = validate_entities_exist(extracted_filters.equality_filters)
+                if entity_check.get("should_abort"):
+                    return [], entity_check["abort_message"]
+            docs = retriever.search_with_filters(query, extracted_filters)
+            return docs, None
     """
     if mode == RAGMode.FLASH:
         return get_flash_chain(
@@ -468,7 +586,8 @@ def get_rag_chain(
             k_total=k_total,
             with_history=with_history,
             with_summary=with_summary,
-            analytics_path=analytics_path
+            analytics_path=analytics_path,
+            filter_hook=filter_hook
         )
     else:
         return get_thinking_chain(
@@ -476,5 +595,6 @@ def get_rag_chain(
             k_total=k_total,
             with_history=with_history,
             with_summary=with_summary,
-            analytics_path=analytics_path
+            analytics_path=analytics_path,
+            filter_hook=filter_hook
         )
