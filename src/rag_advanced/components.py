@@ -581,6 +581,32 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
             logger.warning(f"Entity validation failed: {entity_check['warning_message']}")
             entity_warning = create_grounding_warning(entity_check["missing_entities"])
 
+            # ABORT if critical entity (like developer) is missing
+            if entity_check.get("should_abort", False):
+                logger.warning("Aborting query - critical entity not found in corpus")
+                missing_info = entity_check["missing_entities"][0]  # Get first missing
+                available_list = ", ".join(missing_info["available"][:8])
+
+                if lang == 'spanish':
+                    abort_msg = f"""**⚠️ Datos No Disponibles**
+
+No se encontraron proyectos de **{missing_info['value']}** en el corpus.
+
+**{missing_info['label'].title()}s disponibles:** {available_list}
+
+Por favor reformule su pregunta usando uno de los {missing_info['label']}s disponibles."""
+                else:
+                    abort_msg = f"""**⚠️ Data Not Available**
+
+No **{missing_info['value']}** projects found in the corpus.
+
+**Available {missing_info['label']}s:** {available_list}
+
+Please rephrase your question using one of the available {missing_info['label']}s."""
+
+                yield abort_msg
+                return
+
     # 4. Query Expansion
     queries = expand_query(question)
 

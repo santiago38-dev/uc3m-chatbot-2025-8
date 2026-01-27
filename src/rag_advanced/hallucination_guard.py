@@ -43,47 +43,115 @@ def get_corpus_metadata_values(field: str) -> Set[str]:
         return set()
 
 
-def validate_entities_exist(extracted_metadata: Dict) -> Dict:
+def fuzzy_match(query: str, corpus_values: Set[str]) -> Tuple[bool, str]:
+    """
+    Check if query matches any corpus value using partial/fuzzy matching.
+
+    Handles cases like:
+    - "NEXTERA" matching "NEXTERA ENERGY RESOURCES"
+    - "RWE" matching "RWE SOLAR DEVELOPMENT"
+
+    Returns:
+        Tuple of (found: bool, matched_value: str or None)
+    """
+    query = query.upper().strip()
+
+    # Exact match first
+    if query in corpus_values:
+        return True, query
+
+    # Partial match: query is substring of corpus value
+    for cv in corpus_values:
+        if query in cv:
+            return True, cv
+
+    # Partial match: corpus value is substring of query
+    for cv in corpus_values:
+        if cv in query:
+            return True, cv
+
+    # Common variations/aliases
+    aliases = {
+        "NEXTERA": ["NEXTERA ENERGY", "NEXTERA RESOURCES", "FPL", "FLORIDA POWER"],
+        "RWE": ["RWE SOLAR", "RWE RENEWABLES", "RWE CLEAN ENERGY"],
+        "SAMSUNG": ["SAMSUNG C&T", "SAMSUNG SDI"],
+        "CENTERPOINT": ["CENTERPOINT ENERGY", "CNP"],
+        "ONCOR": ["ONCOR ELECTRIC"],
+    }
+
+    if query in aliases:
+        for alias in aliases[query]:
+            for cv in corpus_values:
+                if alias in cv or cv in alias:
+                    return True, cv
+
+    return False, None
+
+
+def validate_entities_exist(extracted_metadata: Dict, strict: bool = False) -> Dict:
     """
     PRE-VALIDATION: Check if extracted entities actually exist in the corpus.
 
     Args:
         extracted_metadata: Dict from extract_query_metadata()
                            e.g., {"parent_company": "NEXTERA", "zone": "WEST"}
+        strict: If True, exact match only. If False, allows partial/fuzzy matching.
 
     Returns:
         Dict with validation results:
         {
             "valid": True/False,
             "missing_entities": [{"field": "parent_company", "value": "NEXTERA", "available": ["RWE", "SAMSUNG", ...]}],
-            "warning_message": "No NEXTERA projects found in corpus. Available developers: RWE, SAMSUNG, ..."
+            "warning_message": "No NEXTERA projects found in corpus. Available developers: RWE, SAMSUNG, ...",
+            "should_abort": True/False  # Recommend aborting query for missing critical entities
         }
     """
     missing = []
+    matched = {}  # Track what was matched for logging
 
     # Fields that are important to validate
+    # critical=True means query should abort if not found
     validatable_fields = {
-        "parent_company": "developer",
-        "zone": "zone",
-        "fuel_type": "fuel type",
-        "tsp_normalized": "TSP",
-        "county": "county"
+        "parent_company": {"label": "developer", "critical": True},
+        "zone": {"label": "zone", "critical": False},
+        "fuel_type": {"label": "fuel type", "critical": False},
+        "tsp_normalized": {"label": "TSP", "critical": False},
+        "county": {"label": "county", "critical": False}
     }
 
-    for field, label in validatable_fields.items():
+    should_abort = False
+
+    for field, config in validatable_fields.items():
         if field in extracted_metadata:
             queried_value = str(extracted_metadata[field]).upper().strip()
             corpus_values = get_corpus_metadata_values(field)
 
-            if corpus_values and queried_value not in corpus_values:
+            if not corpus_values:
+                continue  # Can't validate if no corpus data
+
+            # Try fuzzy matching unless strict mode
+            if strict:
+                found = queried_value in corpus_values
+                matched_value = queried_value if found else None
+            else:
+                found, matched_value = fuzzy_match(queried_value, corpus_values)
+
+            if not found:
                 # Entity not found in corpus
-                available = sorted(list(corpus_values))[:10]  # Limit to 10 examples
+                available = sorted(list(corpus_values))[:10]
                 missing.append({
                     "field": field,
                     "value": queried_value,
-                    "label": label,
-                    "available": available
+                    "label": config["label"],
+                    "available": available,
+                    "critical": config["critical"]
                 })
+
+                # Mark for abort if critical field is missing
+                if config["critical"]:
+                    should_abort = True
+            else:
+                matched[field] = matched_value
 
     if missing:
         # Build warning message
@@ -100,10 +168,18 @@ def validate_entities_exist(extracted_metadata: Dict) -> Dict:
         return {
             "valid": False,
             "missing_entities": missing,
-            "warning_message": " | ".join(warnings)
+            "matched_entities": matched,
+            "warning_message": " | ".join(warnings),
+            "should_abort": should_abort
         }
 
-    return {"valid": True, "missing_entities": [], "warning_message": None}
+    return {
+        "valid": True,
+        "missing_entities": [],
+        "matched_entities": matched,
+        "warning_message": None,
+        "should_abort": False
+    }
 
 
 def validate_response_grounding(
