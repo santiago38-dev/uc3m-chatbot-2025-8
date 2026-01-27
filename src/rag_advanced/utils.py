@@ -150,7 +150,8 @@ def format_sources(docs, max_sources: int = None) -> Dict[str, Any]:
         meta = doc.metadata
         project = meta.get('project_name', 'Unknown')
         inr = meta.get('inr', 'N/A')
-        section = meta.get('section', 'N/A')
+        # Use section_type (primary field), fall back to section
+        section = meta.get('section_type') or meta.get('section', 'N/A')
 
         formatted_parts.append(f"[Source {i}: {project} ({inr}) - {section}]\n{doc.page_content}\n")
         source_list.append({
