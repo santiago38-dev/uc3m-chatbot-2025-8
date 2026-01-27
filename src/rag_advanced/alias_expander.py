@@ -15,119 +15,87 @@ from typing import List, Dict, Set
 # PARENT COMPANY ALIASES
 # Map canonical names to ALL variants that might be stored in ChromaDB
 # These must match EXACTLY what's in your corpus metadata
+# Updated based on verify_corpus_developers.py output
 # =============================================================================
 
 CHROMADB_PARENT_ALIASES: Dict[str, List[str]] = {
-    # Tier 1: The Giants
+    # === VERIFIED FROM CORPUS (exact values) ===
     'RWE': [
         'RWE',
-        'RWE SOLAR DEVELOPMENT',
-        'RWE SOLAR DEVELOPMENT, LLC',
-        'RWE RENEWABLES',
-        'RWE RENEWABLES AMERICAS',
-        'RWE RENEWABLES AMERICAS, LLC',
-        'RWE RENEWABLES DEVELOPMENT',
-        'RWE RENEWABLES DEVELOPMENT, LLC',
-        'RWE CLEAN ENERGY',
-        'RWE CLEAN ENERGY, LLC',
-        'E.ON',
-        'INLAND',
+        'RWE Clean Energy Development, LLC',  # 69 chunks in corpus
+        'RWE Solar Development, LLC',          # 68 chunks in corpus
     ],
     'SAMSUNG': [
-        'SAMSUNG',
-        'SAMSUNG C&T',
-        'SAMSUNG C&T AMERICA',
-        'SAMSUNG C&T AMERICA, INC.',
-        'SAMSUNG C&T AMERICA, INC',
-        'SAMSUNG C&T CORPORATION',
-        'SAMSUNG SDI',
-        'SAMSUNG SDI AMERICA',
-        'SAMSUNG SDI AMERICA, INC.',
+        'SAMSUNG',                             # 63 chunks in corpus
+        'SAMSUNG C&T',                         # 77 chunks in corpus
     ],
+    'INTERSECT': [
+        'INTERSECT',                           # 150 chunks in corpus
+    ],
+    'ENGIE': [
+        'ENGIE',                               # 207 chunks in corpus
+    ],
+    'SUNCHASE': [
+        'SUNCHASE',                            # 207 chunks in corpus
+    ],
+    'CENTERPOINT ENERGY': [
+        'CENTERPOINT ENERGY',                  # 153 chunks in corpus
+    ],
+    'NRG': [
+        'NRG',
+        'NRG THW GT LLC',                      # 159 chunks in corpus
+    ],
+
+    # === ADDITIONAL COMMON ALIASES (may need verification) ===
     'NEXTERA': [
         'NEXTERA',
         'NEXTERA ENERGY',
         'NEXTERA ENERGY RESOURCES',
         'NEXTERA ENERGY RESOURCES, LLC',
-        'NEXTERA ENERGY INTERCONNECTION HOLDINGS',
-        'NEXTERA ENERGY INTERCONNECTION HOLDINGS, LLC',
         'FPL',
         'FPL GROUP',
-        'FLORIDA POWER',
-        'LOGAN P',
     ],
     'INVENERGY': [
         'INVENERGY',
         'INVENERGY LLC',
         'INVENERGY SERVICES',
-        'INVENERGY SERVICES LLC',
-        'INVENERGY SOLAR',
-        'INVENERGY SOLAR LLC',
-        'INVENERGY WIND',
-        'INVENERGY WIND LLC',
     ],
     'EDF': [
         'EDF',
         'EDF RENEWABLES',
         'EDF RENEWABLES NORTH AMERICA',
-        'EDF RENEWABLE ENERGY',
-        'EDF RENEWABLE ENERGY, INC.',
-        'EDF RENEWABLES, INC.',
     ],
     'ENEL': [
         'ENEL',
         'ENEL GREEN POWER',
         'ENEL GREEN POWER NORTH AMERICA',
-        'ENEL GREEN POWER NORTH AMERICA, INC.',
-        'ENEL X',
     ],
     'AES': [
         'AES',
         'AES CORPORATION',
         'AES CLEAN ENERGY',
-        'AES CLEAN ENERGY, LLC',
-        'AES SOLAR',
-    ],
-    'ENGIE': [
-        'ENGIE',
-        'ENGIE NORTH AMERICA',
-        'ENGIE NORTH AMERICA INC.',
-        'ENGIE SOLAR',
     ],
     'ORSTED': [
         'ORSTED',
         'ØRSTED',
         'ORSTED NORTH AMERICA',
-        'ORSTED ONSHORE',
     ],
     'AVANGRID': [
         'AVANGRID',
         'AVANGRID RENEWABLES',
-        'AVANGRID RENEWABLES, LLC',
     ],
     'PATTERN': [
         'PATTERN',
         'PATTERN ENERGY',
-        'PATTERN ENERGY GROUP',
     ],
-
-    # Tier 2: Major Players
     'CANADIAN SOLAR': [
         'CANADIAN SOLAR',
         'RECURRENT',
         'RECURRENT ENERGY',
-        'RECURRENT ENERGY, LLC',
     ],
     'LIGHTSOURCE BP': [
         'LIGHTSOURCE',
         'LIGHTSOURCE BP',
-        'BP',
-        'BP SOLAR',
-    ],
-    'INTERSECT': [
-        'INTERSECT',
-        'INTERSECT POWER',
-        'INTERSECT POWER, LLC',
     ],
     'SAVION': [
         'SAVION',
@@ -136,18 +104,14 @@ CHROMADB_PARENT_ALIASES: Dict[str, List[str]] = {
     'CLEARWAY': [
         'CLEARWAY',
         'CLEARWAY ENERGY',
-        'CLEARWAY ENERGY GROUP',
     ],
     'APEX': [
         'APEX',
         'APEX CLEAN ENERGY',
-        'APEX CLEAN ENERGY, INC.',
     ],
     'HECATE': [
         'HECATE',
         'HECATE ENERGY',
-        'HECATE ENERGY LLC',
-        'HECATE ENERGY, LLC',
     ],
     'LEEWARD': [
         'LEEWARD',
@@ -165,16 +129,9 @@ CHROMADB_PARENT_ALIASES: Dict[str, List[str]] = {
         '174 POWER',
         '174 POWER GLOBAL',
     ],
-    'ADAPTURE': [
-        'ADAPTURE',
-        'ADAPTURE RENEWABLES',
-    ],
-
-    # Tier 3: Battery/Storage Specialists
     'PLUS POWER': [
         'PLUS POWER',
         'PLUS POWER LLC',
-        'PLUS POWER, LLC',
     ],
     'KEY CAPTURE': [
         'KEY CAPTURE',
@@ -187,58 +144,29 @@ CHROMADB_PARENT_ALIASES: Dict[str, List[str]] = {
     'JUPITER': [
         'JUPITER',
         'JUPITER POWER',
-        'JUPITER POWER LLC',
     ],
-    'ABLE GRID': [
-        'ABLE GRID',
-        'ABLE GRID ENERGY',
-    ],
-
-    # Tier 4: Utilities & IPPs
     'VISTRA': [
         'VISTRA',
         'VISTRA CORP',
         'VISTRA ENERGY',
     ],
-    'NRG': [
-        'NRG',
-        'NRG ENERGY',
-        'NRG ENERGY, INC.',
-    ],
     'DUKE': [
         'DUKE',
         'DUKE ENERGY',
-        'DUKE ENERGY RENEWABLES',
     ],
     'SOUTHERN': [
         'SOUTHERN',
         'SOUTHERN COMPANY',
         'SOUTHERN POWER',
-        'SOUTHERN POWER COMPANY',
     ],
-
-    # Tier 5: Regional/Other
     'ORIGIS': [
         'ORIGIS',
         'ORIGIS ENERGY',
-    ],
-    'SOL SYSTEMS': [
-        'SOL SYSTEMS',
-        'SOL SYSTEMS LLC',
-    ],
-    'TRI GLOBAL': [
-        'TRI GLOBAL',
-        'TRI-GLOBAL',
-        'TRI GLOBAL ENERGY',
     ],
     '8MINUTE': [
         '8MINUTE',
         '8 MINUTE',
         '8MINUTE SOLAR ENERGY',
-    ],
-    'IP ENERGY': [
-        'IP ENERGY',
-        'IP QUANTUM',
     ],
 }
 
@@ -246,59 +174,46 @@ CHROMADB_PARENT_ALIASES: Dict[str, List[str]] = {
 # =============================================================================
 # TSP ALIASES
 # Map TSP short names to all known variants in ChromaDB
+# Updated based on verify_corpus_developers.py output
 # =============================================================================
 
 CHROMADB_TSP_ALIASES: Dict[str, List[str]] = {
+    # === VERIFIED FROM CORPUS (exact values) ===
     'ONCOR': [
-        'ONCOR',
-        'ONCOR ELECTRIC',
-        'ONCOR ELECTRIC DELIVERY',
-        'ONCOR ELECTRIC DELIVERY COMPANY',
-        'ONCOR ELECTRIC DELIVERY COMPANY LLC',
-        'ONCOR ELECTRIC DELIVERY COMPANY, LLC',
+        'ONCOR',                               # 2579 chunks in corpus
     ],
     'CENTERPOINT': [
-        'CENTERPOINT',
-        'CENTERPOINT ENERGY',
-        'CENTERPOINT ENERGY HOUSTON',
-        'CENTERPOINT ENERGY HOUSTON ELECTRIC',
-        'CENTERPOINT ENERGY HOUSTON ELECTRIC, LLC',
-        'CNP',
-        'CPNT',
+        'CENTERPOINT',                         # 4779 chunks in corpus
     ],
     'AEP': [
-        'AEP',
-        'AEP TEXAS',
-        'AEP TEXAS INC',
-        'AEP TEXAS INC.',
-        'AEP TEXAS CENTRAL',
-        'AEP TEXAS CENTRAL COMPANY',
-        'AEP TEXAS NORTH',
-        'AEP TEXAS NORTH COMPANY',
-        'SWEPCO',
+        'AEP',                                  # 1240 chunks in corpus
     ],
     'TNMP': [
-        'TNMP',
-        'TEXAS-NEW MEXICO POWER',
-        'TEXAS-NEW MEXICO POWER COMPANY',
-        'TEXAS NEW MEXICO POWER',
+        'TNMP',                                 # 1494 chunks in corpus
     ],
     'ETT': [
-        'ETT',
-        'ELECTRIC TRANSMISSION TEXAS',
-        'ELECTRIC TRANSMISSION TEXAS, LLC',
-        'ELECTRIC TRANSMISSION TEXAS LLC',
+        'ETT',                                  # 555 chunks in corpus
     ],
     'LCRA': [
-        'LCRA',
-        'LCRA TSC',
-        'LCRA TRANSMISSION SERVICES',
-        'LOWER COLORADO RIVER AUTHORITY',
+        'LCRA',                                 # 444 chunks in corpus
     ],
+    'LONE STAR': [
+        'LONE STAR',                           # 171 chunks in corpus
+    ],
+    'CPS': [
+        'CPS',                                  # 152 chunks in corpus
+    ],
+    'BRAZOS': [
+        'BRAZOS',                              # 66 chunks in corpus
+    ],
+    'RAYBURN': [
+        'Rayburn Country Electric Cooperative, Inc.',  # 121 chunks in corpus
+    ],
+
+    # === ADDITIONAL ALIASES (for query flexibility) ===
     'SHARYLAND': [
         'SHARYLAND',
         'SHARYLAND UTILITIES',
-        'SHARYLAND UTILITIES, L.P.',
     ],
 }
 
