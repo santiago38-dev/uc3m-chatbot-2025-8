@@ -165,21 +165,39 @@ def format_developer_stats(dev_analysis: Dict) -> str:
     """Format developer analysis for context."""
     lines = []
 
-    # Multi-zone developers
+    # Multi-zone developers - handles both formats:
+    # New format: {dev: [zone_list]} or Old format: {dev: {project_count, zones}}
     multi_zone = dev_analysis.get("multi_zone_developers", {})
     if multi_zone:
         lines.append("**Multi-Zone Developers:**")
-        for dev, data in sorted(multi_zone.items(), key=lambda x: x[1].get("project_count", 0), reverse=True)[:5]:
-            zones = ", ".join(data.get("zones", []))
-            lines.append(f"- {dev}: {data.get('project_count', 0)} projects across zones: {zones}")
+        for dev, data in list(multi_zone.items())[:5]:
+            if isinstance(data, list):
+                # New format: data is list of zones
+                zones = ", ".join(data)
+                lines.append(f"- {dev}: zones: {zones}")
+            elif isinstance(data, dict):
+                # Old format: data is dict with project_count and zones
+                zones = ", ".join(data.get("zones", []))
+                lines.append(f"- {dev}: {data.get('project_count', 0)} projects across zones: {zones}")
 
-    # Diversified portfolios
-    diversified = dev_analysis.get("diversified_portfolios", {})
+    # Diversified portfolios - handles both formats:
+    # New format: list of {developer, technologies, project_count}
+    # Old format: dict of {dev: {project_count, fuel_types}}
+    diversified = dev_analysis.get("diversified_portfolios", [])
     if diversified:
         lines.append("\n**Diversified Portfolios (multiple fuel types):**")
-        for dev, data in sorted(diversified.items(), key=lambda x: x[1].get("project_count", 0), reverse=True)[:5]:
-            fuel_types = ", ".join(data.get("fuel_types", []))
-            lines.append(f"- {dev}: {data.get('project_count', 0)} projects ({fuel_types})")
+        if isinstance(diversified, list):
+            # New format: list of dicts
+            for item in diversified[:5]:
+                dev = item.get("developer", "Unknown")
+                techs = ", ".join(item.get("technologies", item.get("fuel_types", [])))
+                count = item.get("project_count", 0)
+                lines.append(f"- {dev}: {count} projects ({techs})")
+        elif isinstance(diversified, dict):
+            # Old format: dict
+            for dev, data in sorted(diversified.items(), key=lambda x: x[1].get("project_count", 0), reverse=True)[:5]:
+                fuel_types = ", ".join(data.get("fuel_types", []))
+                lines.append(f"- {dev}: {data.get('project_count', 0)} projects ({fuel_types})")
 
     return "\n".join(lines)
 
@@ -188,12 +206,14 @@ def get_analytics_context(analytics: Dict) -> str:
     """Format all analytics into context string for LLM."""
     lines = []
 
-    # Summary stats
-    summary = analytics.get("summary", {})
+    # Summary stats - handles both "summary" and "corpus_stats" keys
+    summary = analytics.get("summary") or analytics.get("corpus_stats", {})
     if summary:
         lines.append("### CORPUS SUMMARY")
         lines.append(f"- Total projects: {summary.get('total_projects', 'N/A')}")
-        lines.append(f"- Projects with security data: {summary.get('projects_with_security', 'N/A')}")
+        # Handle both key names for security data count
+        sec_count = summary.get('projects_with_security') or summary.get('projects_with_security_data', 'N/A')
+        lines.append(f"- Projects with security data: {sec_count}")
 
         sec_stats = summary.get("security_per_kw", {})
         if sec_stats:
@@ -224,8 +244,10 @@ def get_analytics_context(analytics: Dict) -> str:
         lines.append("\n### DEVELOPER ANALYSIS")
         lines.append(format_developer_stats(dev_analysis))
 
-    # Specific developer sections
-    rwe_data = analytics.get("rwe_specific", {})
+    # Specific developer sections - handles both old format and new "specific_developers" format
+    specific_devs = analytics.get("specific_developers", {})
+
+    rwe_data = analytics.get("rwe_specific") or specific_devs.get("RWE", {})
     if rwe_data:
         lines.append("\n### RWE PROJECTS")
         lines.append(f"- Project count: {rwe_data.get('project_count', 'N/A')}")
@@ -235,20 +257,28 @@ def get_analytics_context(analytics: Dict) -> str:
             if vs_market:
                 lines.append(f"- vs Market median: {vs_market}")
 
-    nextera_data = analytics.get("nextera_specific", {})
+    nextera_data = analytics.get("nextera_specific") or specific_devs.get("NEXTERA", {})
     if nextera_data:
         lines.append("\n### NEXTERA PROJECTS")
         lines.append(f"- Project count: {nextera_data.get('project_count', 'N/A')}")
         if nextera_data.get("median_security_per_kw"):
             lines.append(f"- Median security: ${nextera_data.get('median_security_per_kw')}/kW")
 
-    # Data quality notes
+    # Data quality notes - handles both "low_sample_categories" and "low_sample_warnings" formats
     quality = analytics.get("data_quality", {})
-    if quality.get("low_sample_categories"):
+    low_sample = quality.get("low_sample_categories") or quality.get("low_sample_warnings", [])
+    if low_sample:
         lines.append("\n### DATA QUALITY NOTES")
         lines.append("Categories with limited sample size (n<10):")
-        for cat in quality.get("low_sample_categories", [])[:5]:
-            lines.append(f"- {cat}")
+        for item in low_sample[:5]:
+            if isinstance(item, str):
+                lines.append(f"- {item}")
+            elif isinstance(item, dict):
+                # New format: {category, bucket, sample_size, warning}
+                cat = item.get("category", "")
+                bucket = item.get("bucket", "")
+                n = item.get("sample_size", "?")
+                lines.append(f"- {cat}/{bucket}: n={n}")
 
     return "\n".join(lines)
 

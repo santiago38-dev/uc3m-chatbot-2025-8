@@ -142,6 +142,12 @@ def extract_multi_filters_from_query(query: str) -> Dict[str, Any]:
         else:
             filters['zone'] = zone_matches
 
+    # === INR (Interconnection Request Number) ===
+    # Pattern: YYINR####  e.g., "25INR0138", "24INR0485"
+    inr_match = re.search(r'\b(\d{2}INR\d{4})\b', query, re.IGNORECASE)
+    if inr_match:
+        filters['inr'] = inr_match.group(1).upper()
+
     # === NUMERIC FILTERS ===
     # Security per kW threshold (e.g., ">$100/kW", "over $100 per kW")
     sec_match = re.search(

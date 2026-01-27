@@ -21,10 +21,51 @@ Usage:
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+# =============================================================================
+# RESPONSE VALIDATION - Failure Pattern Detection
+# =============================================================================
+
+# Patterns that indicate the LLM failed to answer correctly (false negatives)
+FAILURE_PATTERNS = [
+    r"I don't have",
+    r"I do not have",
+    r"couldn't find",
+    r"could not find",
+    r"no information about",
+    r"not related to ERCOT",
+    r"This question is not related",
+    r"unable to find",
+    r"cannot find",
+    r"no documents found",
+    r"no matching documents",
+    r"Unfortunately, I",
+]
+
+# Compile patterns for efficiency
+_FAILURE_REGEX = re.compile("|".join(FAILURE_PATTERNS), re.IGNORECASE)
+
+
+def detect_response_failure(response: str) -> Optional[str]:
+    """
+    Check if a response contains failure patterns indicating the LLM couldn't answer.
+
+    Returns:
+        None if response is valid, or the matched failure pattern if detected
+    """
+    if not response:
+        return "Empty response"
+
+    match = _FAILURE_REGEX.search(response[:500])  # Check first 500 chars
+    if match:
+        return match.group(0)
+
+    return None
 
 # =============================================================================
 # QUESTION DEFINITIONS - Organized by Role
@@ -429,7 +470,18 @@ def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Di
 
         try:
             response = test_full_chain(question, mode=mode, verbose=verbose)
-            results[qid] = {"status": "OK", "response_len": len(response)}
+
+            # Check for failure patterns in the response
+            failure_pattern = detect_response_failure(response)
+            if failure_pattern:
+                results[qid] = {
+                    "status": "FAIL",
+                    "response_len": len(response),
+                    "failure_reason": f"Response contains failure pattern: '{failure_pattern}'"
+                }
+                print(f"⚠️ DETECTED FAILURE PATTERN: '{failure_pattern}'")
+            else:
+                results[qid] = {"status": "OK", "response_len": len(response)}
         except Exception as e:
             results[qid] = {"status": "ERROR", "error": str(e)}
             print(f"ERROR: {e}")
@@ -444,6 +496,7 @@ def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Di
     passed = 0
     failed = 0
     expected_fail = 0
+    content_fail = 0  # New: responses that passed exception check but contain failure patterns
 
     for qid, result in results.items():
         meta = TEST_QUESTIONS_METADATA.get(qid, {})
@@ -453,17 +506,31 @@ def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Di
         if result["status"] == "OK":
             status = "✅"
             passed += 1
+        elif result["status"] == "FAIL":
+            # Response ran but contained failure patterns
+            if not should_work:
+                status = "⚠️"  # Expected failure
+                expected_fail += 1
+            else:
+                status = "🔴"  # Content failure - unexpected
+                content_fail += 1
         elif not should_work:
-            status = "⚠️"  # Expected failure
+            status = "⚠️"  # Expected failure (ERROR)
             expected_fail += 1
         else:
-            status = "❌"
+            status = "❌"  # Unexpected ERROR
             failed += 1
 
-        extra = " (expected)" if not should_work and result["status"] != "OK" else ""
+        extra = ""
+        if not should_work and result["status"] != "OK":
+            extra = " (expected)"
+        elif result.get("failure_reason"):
+            extra = f" [{result['failure_reason'][:40]}...]"
         print(f"  {qid} [{role:11}]: {status} {result['status']}{extra}")
 
-    print(f"\n  TOTAL: {passed} passed, {failed} failed, {expected_fail} expected failures")
+    print(f"\n  TOTAL: {passed} passed, {failed} errors, {content_fail} content failures, {expected_fail} expected failures")
+    if content_fail > 0:
+        print(f"  ⚠️  {content_fail} responses ran without error but contain failure patterns!")
 
     return results
 
@@ -497,11 +564,38 @@ def test_all_modes(verbose: bool = False, questions: Dict[str, str] = None):
         qtype = meta.get("type", "")[:10]
         should_work = meta.get("should_work", True)
 
-        flash_ok = all_results["flash"].get(qid, {}).get("status") == "OK"
-        think_ok = all_results["thinking"].get(qid, {}).get("status") == "OK"
+        flash_result = all_results["flash"].get(qid, {}).get("status", "")
+        think_result = all_results["thinking"].get(qid, {}).get("status", "")
 
-        flash_status = "✅" if flash_ok else ("⚠️" if not should_work else "❌")
-        think_status = "✅" if think_ok else ("⚠️" if not should_work else "❌")
+        # OK = passed, FAIL = content failure, ERROR = exception
+        flash_ok = flash_result == "OK"
+        think_ok = think_result == "OK"
+        flash_fail = flash_result == "FAIL"
+        think_fail = think_result == "FAIL"
+
+        # Status icons: ✅=OK, 🔴=content fail, ❌=error, ⚠️=expected fail
+        if flash_ok:
+            flash_status = "✅"
+        elif flash_fail and not should_work:
+            flash_status = "⚠️"
+        elif flash_fail:
+            flash_status = "🔴"
+        elif not should_work:
+            flash_status = "⚠️"
+        else:
+            flash_status = "❌"
+
+        if think_ok:
+            think_status = "✅"
+        elif think_fail and not should_work:
+            think_status = "⚠️"
+        elif think_fail:
+            think_status = "🔴"
+        elif not should_work:
+            think_status = "⚠️"
+        else:
+            think_status = "❌"
+
         expected = "✅" if should_work else "⚠️ FAIL"
 
         print(f"{qid:<8} {role:<12} {qtype:<12} {flash_status:<8} {think_status:<8} {expected:<8}")
@@ -509,10 +603,14 @@ def test_all_modes(verbose: bool = False, questions: Dict[str, str] = None):
     # Summary counts
     flash_pass = sum(1 for qid in questions if all_results["flash"].get(qid, {}).get("status") == "OK")
     think_pass = sum(1 for qid in questions if all_results["thinking"].get(qid, {}).get("status") == "OK")
+    flash_content_fail = sum(1 for qid in questions if all_results["flash"].get(qid, {}).get("status") == "FAIL")
+    think_content_fail = sum(1 for qid in questions if all_results["thinking"].get(qid, {}).get("status") == "FAIL")
     expected_work = sum(1 for qid in questions if TEST_QUESTIONS_METADATA.get(qid, {}).get("should_work", True))
 
     print("-" * 60)
     print(f"PASSED:  Flash={flash_pass}/{len(questions)}, Thinking={think_pass}/{len(questions)}")
+    if flash_content_fail > 0 or think_content_fail > 0:
+        print(f"CONTENT FAILURES 🔴: Flash={flash_content_fail}, Thinking={think_content_fail}")
     print(f"Expected to work: {expected_work}/{len(questions)}")
 
     return all_results
