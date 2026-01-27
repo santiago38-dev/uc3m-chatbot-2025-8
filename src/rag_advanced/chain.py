@@ -37,7 +37,7 @@ from .attribution_validator import (
     validate_developer_attributions,
     check_missing_entities,
     generate_attribution_warning,
-    get_developers_in_docs,
+    get_entities_in_docs,
     create_grounding_context
 )
 from .alias_expander import get_canonical_parent
@@ -334,14 +334,19 @@ def create_comparative_filter_hook(
         missing_warning = None
         if is_comparative:
             requested_entities = []
+            entity_type = 'parent_company'  # Default
+
             if isinstance(filters.get('parent_company'), list):
                 requested_entities = filters['parent_company']
+                entity_type = 'parent_company'
             elif isinstance(filters.get('tsp_normalized'), list):
                 requested_entities = filters['tsp_normalized']
+                entity_type = 'tsp_normalized'
 
             if requested_entities:
-                found_entities = get_developers_in_docs(docs)
-                missing = check_missing_entities(requested_entities, docs)
+                # Use entity-type-aware functions for proper TSP vs parent company detection
+                found_entities = get_entities_in_docs(docs, entity_type)
+                missing = check_missing_entities(requested_entities, docs, entity_type)
                 if missing:
                     lang = detect_language(query)
                     missing_warning = generate_attribution_warning(

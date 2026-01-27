@@ -69,12 +69,55 @@ def get_developers_in_docs(docs: List[Document]) -> Set[str]:
             # Get canonical name for consistency
             canonical = get_canonical_parent(dev)
             developers.add(canonical)
+            # Also add raw value for partial matching
+            developers.add(dev)
     return developers
+
+
+def get_tsps_in_docs(docs: List[Document]) -> Set[str]:
+    """
+    Get set of all TSPs present in retrieved docs.
+
+    Args:
+        docs: Retrieved documents
+
+    Returns:
+        Set of unique TSP names (normalized form)
+    """
+    tsps = set()
+    for doc in docs:
+        tsp = doc.metadata.get('tsp_normalized', '')
+        if tsp:
+            tsps.add(tsp.upper())
+            # Also add common variations
+            tsps.add(tsp)
+    return tsps
+
+
+def get_entities_in_docs(
+    docs: List[Document],
+    entity_type: str = 'parent_company'
+) -> Set[str]:
+    """
+    Get set of entities present in retrieved docs based on entity type.
+
+    Args:
+        docs: Retrieved documents
+        entity_type: 'parent_company' or 'tsp_normalized'
+
+    Returns:
+        Set of unique entity names
+    """
+    if entity_type == 'tsp_normalized':
+        return get_tsps_in_docs(docs)
+    else:
+        return get_developers_in_docs(docs)
 
 
 def check_missing_entities(
     requested_entities: List[str],
-    docs: List[Document]
+    docs: List[Document],
+    entity_type: str = 'parent_company'
 ) -> List[str]:
     """
     Check which requested entities have no documents in the retrieved set.
@@ -85,19 +128,44 @@ def check_missing_entities(
     Args:
         requested_entities: List of entity names from the query (canonical form)
         docs: Retrieved documents
+        entity_type: 'parent_company' or 'tsp_normalized'
 
     Returns:
         List of missing entity names
     """
-    present = get_developers_in_docs(docs)
+    present = get_entities_in_docs(docs, entity_type)
 
-    # Normalize requested to canonical form
-    requested_canonical = [get_canonical_parent(e) for e in requested_entities]
+    # Also get raw values for fuzzy matching
+    present_upper = {p.upper() for p in present}
 
     missing = []
-    for entity in requested_canonical:
-        if entity not in present:
-            missing.append(entity)
+    for entity in requested_entities:
+        entity_upper = entity.upper()
+
+        # Check for exact match first
+        if entity_upper in present_upper:
+            continue
+
+        # Check for partial match (e.g., "CENTERPOINT" matches "CENTERPOINT ENERGY")
+        found = False
+        for p in present_upper:
+            if entity_upper in p or p in entity_upper:
+                found = True
+                break
+
+        if not found:
+            # Also check canonical form for parent_company
+            if entity_type == 'parent_company':
+                canonical = get_canonical_parent(entity)
+                if canonical.upper() in present_upper:
+                    continue
+                for p in present_upper:
+                    if canonical.upper() in p or p in canonical.upper():
+                        found = True
+                        break
+
+            if not found:
+                missing.append(entity)
 
     return missing
 
