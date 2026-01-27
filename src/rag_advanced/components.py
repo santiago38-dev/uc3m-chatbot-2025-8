@@ -18,6 +18,11 @@ from .prompts import (
     QUERY_EXPANSION_PROMPT, METADATA_EXTRACTION_PROMPT,
     SYSTEM_EN, SYSTEM_ES
 )
+from .hallucination_guard import (
+    validate_entities_exist,
+    validate_response_grounding,
+    create_grounding_warning
+)
 
 # --- Domain Filter ---
 
@@ -568,6 +573,14 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # 3. Metadata Extraction
     metadata_filters = extract_query_metadata(question)
 
+    # 3.5 PRE-VALIDATION: Check if queried entities exist in corpus
+    entity_warning = None
+    if metadata_filters:
+        entity_check = validate_entities_exist(metadata_filters)
+        if not entity_check["valid"]:
+            logger.warning(f"Entity validation failed: {entity_check['warning_message']}")
+            entity_warning = create_grounding_warning(entity_check["missing_entities"])
+
     # 4. Query Expansion
     queries = expand_query(question)
 
@@ -627,6 +640,18 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         lang=lang
     )
 
+    # 7.5 POST-VALIDATION: Check for hallucinated developer attributions
+    is_grounded, grounding_issues = validate_response_grounding(
+        response=final_response,
+        retrieved_docs=all_docs,
+        claimed_entities=metadata_filters
+    )
+    if not is_grounded:
+        logger.warning(f"Grounding issues detected: {grounding_issues}")
+        # Add warning to output if not already warned pre-query
+        if not entity_warning:
+            entity_warning = "**⚠️ Grounding Warning:** " + "; ".join(grounding_issues) + "\n\n"
+
     logger.info("=" * 50)
     logger.success("THINKING COMPLETE")
     logger.info("=" * 50)
@@ -634,6 +659,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # 8. Build structured output
     question_type_label = question_type.value.replace("_", " ").title()
     validation_status = "Fixed ⚠" if was_fixed else "Passed ✓"
+    grounding_status = "Grounded ✓" if is_grounded else "Warning ⚠"
 
     if lang == 'spanish':
         thought_summary = f"""**💭 Proceso de análisis:**
@@ -641,6 +667,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 - Consultas generadas: {len(queries)}
 - Documentos recuperados: {len(all_docs)}
 - Validación: {"Corregida ⚠" if was_fixed else "Pasada ✓"}
+- Fundamentación: {"Verificada ✓" if is_grounded else "Advertencia ⚠"}
 
 ---
 
@@ -652,6 +679,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 - Queries generated: {len(queries)}
 - Documents retrieved: {len(all_docs)}
 - Validation: {validation_status}
+- Grounding: {grounding_status}
 
 ---
 
@@ -660,6 +688,11 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     # Stream output
     yield thought_summary
+
+    # If there's an entity warning, show it before the response
+    if entity_warning:
+        yield entity_warning
+
     yield final_response
 
     # 9. Add citations

@@ -64,7 +64,7 @@ DEMO_QUESTIONS = [
         "id": 5,
         "category": "Competitive",
         "title": "Developer Comparison",
-        "question": "Compare RWE and NextEra solar projects. What differences do you see in their interconnection terms?",
+        "question": "Compare RWE and SAMSUNG battery storage projects. What are their security requirements and capacity?",
     },
     {
         "id": 6,
