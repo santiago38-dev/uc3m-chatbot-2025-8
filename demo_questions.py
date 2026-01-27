@@ -153,6 +153,41 @@ TEST_QUESTIONS_METADATA = {
         "type": "single_lookup",
         "notes": "INR lookup - tests exact match retrieval"
     },
+
+    # --- CFO ADDITIONAL ---
+    "Q19": {
+        "question": "Which projects have security amounts above $100/kW? What might explain these outliers?",
+        "role": "CFO",
+        "type": "hard_filter",
+        "notes": "Outlier detection + analysis - builds on Q2 with explanation"
+    },
+
+    # --- DEVELOPMENT ADDITIONAL (Expected to fail - no amendments metadata) ---
+    "Q20": {
+        "question": "Identify projects in COAST zone that have amendments. What might this indicate about development challenges?",
+        "role": "Development",
+        "type": "anomaly",
+        "notes": "EXPECTED TO FAIL - No 'amendments' metadata field exists in corpus",
+        "should_work": False
+    },
+
+    # --- LEGAL ADDITIONAL (Expected to fail - no anomaly detection) ---
+    "Q21": {
+        "question": "What unusual clauses appear in any agreements that a developer should be concerned about?",
+        "role": "Legal",
+        "type": "anomaly",
+        "notes": "EXPECTED TO FAIL - Requires anomaly detection / knowing what's 'normal'",
+        "should_work": False
+    },
+
+    # --- RISK / PORTFOLIO MANAGER (Expected to fail - no ML model) ---
+    "Q22": {
+        "question": "Predict which developers are likely to experience delays based on their agreement terms.",
+        "role": "Risk",
+        "type": "predictive",
+        "notes": "EXPECTED TO FAIL - Requires ML model (not implemented)",
+        "should_work": False
+    },
 }
 
 # Simple dict for backward compatibility
@@ -166,6 +201,7 @@ ROLES = {
     "development": "Development",
     "legal": "Legal",
     "tech": "Tech",
+    "risk": "Risk",
 }
 
 
@@ -404,11 +440,30 @@ def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Di
     print("\n" + "=" * 70)
     print("SUMMARY")
     print("=" * 70)
+
+    passed = 0
+    failed = 0
+    expected_fail = 0
+
     for qid, result in results.items():
-        status = "✅" if result["status"] == "OK" else "❌"
         meta = TEST_QUESTIONS_METADATA.get(qid, {})
         role = meta.get("role", "")
-        print(f"  {qid} [{role:11}]: {status} {result['status']}")
+        should_work = meta.get("should_work", True)
+
+        if result["status"] == "OK":
+            status = "✅"
+            passed += 1
+        elif not should_work:
+            status = "⚠️"  # Expected failure
+            expected_fail += 1
+        else:
+            status = "❌"
+            failed += 1
+
+        extra = " (expected)" if not should_work and result["status"] != "OK" else ""
+        print(f"  {qid} [{role:11}]: {status} {result['status']}{extra}")
+
+    print(f"\n  TOTAL: {passed} passed, {failed} failed, {expected_fail} expected failures")
 
     return results
 
@@ -433,14 +488,32 @@ def test_all_modes(verbose: bool = False, questions: Dict[str, str] = None):
     print("\n\n" + "=" * 70)
     print("FINAL COMPARISON")
     print("=" * 70)
-    print(f"{'Question':<12} {'Role':<12} {'Flash':<10} {'Thinking':<10}")
-    print("-" * 50)
+    print(f"{'Question':<8} {'Role':<12} {'Type':<12} {'Flash':<8} {'Think':<8} {'Expected':<8}")
+    print("-" * 60)
+
     for qid in questions.keys():
         meta = TEST_QUESTIONS_METADATA.get(qid, {})
         role = meta.get("role", "")[:10]
-        flash_status = "✅" if all_results["flash"].get(qid, {}).get("status") == "OK" else "❌"
-        think_status = "✅" if all_results["thinking"].get(qid, {}).get("status") == "OK" else "❌"
-        print(f"{qid:<12} {role:<12} {flash_status:<10} {think_status:<10}")
+        qtype = meta.get("type", "")[:10]
+        should_work = meta.get("should_work", True)
+
+        flash_ok = all_results["flash"].get(qid, {}).get("status") == "OK"
+        think_ok = all_results["thinking"].get(qid, {}).get("status") == "OK"
+
+        flash_status = "✅" if flash_ok else ("⚠️" if not should_work else "❌")
+        think_status = "✅" if think_ok else ("⚠️" if not should_work else "❌")
+        expected = "✅" if should_work else "⚠️ FAIL"
+
+        print(f"{qid:<8} {role:<12} {qtype:<12} {flash_status:<8} {think_status:<8} {expected:<8}")
+
+    # Summary counts
+    flash_pass = sum(1 for qid in questions if all_results["flash"].get(qid, {}).get("status") == "OK")
+    think_pass = sum(1 for qid in questions if all_results["thinking"].get(qid, {}).get("status") == "OK")
+    expected_work = sum(1 for qid in questions if TEST_QUESTIONS_METADATA.get(qid, {}).get("should_work", True))
+
+    print("-" * 60)
+    print(f"PASSED:  Flash={flash_pass}/{len(questions)}, Thinking={think_pass}/{len(questions)}")
+    print(f"Expected to work: {expected_work}/{len(questions)}")
 
     return all_results
 
@@ -448,10 +521,13 @@ def test_all_modes(verbose: bool = False, questions: Dict[str, str] = None):
 def list_questions():
     """List all available questions with metadata."""
     print("\n" + "=" * 70)
-    print("AVAILABLE TEST QUESTIONS")
+    print("AVAILABLE TEST QUESTIONS (22 total)")
     print("=" * 70)
 
     current_role = None
+    working_count = 0
+    expected_fail_count = 0
+
     for qid, meta in TEST_QUESTIONS_METADATA.items():
         role = meta["role"]
         if role != current_role:
@@ -460,9 +536,21 @@ def list_questions():
 
         qtype = meta["type"]
         notes = meta.get("notes", "")
-        print(f"  {qid}: [{qtype:12}] {meta['question'][:50]}...")
+        should_work = meta.get("should_work", True)
+
+        status_icon = "✅" if should_work else "⚠️"
+        if should_work:
+            working_count += 1
+        else:
+            expected_fail_count += 1
+
+        print(f"  {qid}: {status_icon} [{qtype:12}] {meta['question'][:45]}...")
         if notes:
             print(f"       Note: {notes}")
+
+    print(f"\n--- SUMMARY ---")
+    print(f"  ✅ Expected to work: {working_count}")
+    print(f"  ⚠️  Expected to fail: {expected_fail_count} (anomaly/predictive - no ML)")
 
 
 # =============================================================================
