@@ -1,221 +1,305 @@
 {
-  "generated_at": "2025-01-27T00:00:00Z",
-  "chromadb_path": "./output/chromadb",
-  "note": "SAMPLE DATA - Regenerate with: python -m src.analytics.corpus_analytics --output data/corpus_analytics.json",
+  "generated_at": "2026-01-27T15:33:07.051199Z",
+  "chromadb_path": "C:/Users/szcas/OneDrive/AI Masters/1. ERCOT_NLP/Github/ercot-lgia-rag-system/output/chromadb",
   "corpus_stats": {
-    "total_projects": 133,
-    "total_chunks": 2450,
-    "projects_with_security_data": 82,
+    "total_projects": 132,
+    "total_chunks": 11601,
+    "projects_with_security_data": 78,
     "security_per_kw": {
-      "n": 82,
-      "median": 48.50,
-      "mean": 56.23,
-      "min": 0.28,
-      "max": 132.10,
-      "std_dev": 28.40
+      "n": 78,
+      "median": 63.58,
+      "mean": 78.69,
+      "min": 0.19,
+      "max": 213.2,
+      "std_dev": 56.54
     }
   },
   "by_fuel_type": {
-    "Battery": {
-      "count": 35,
-      "projects_with_security_data": 28,
-      "median_security_per_kw": 47.00,
-      "mean_security_per_kw": 49.20,
-      "n": 28
-    },
     "Solar": {
-      "count": 45,
-      "projects_with_security_data": 32,
-      "median_security_per_kw": 52.30,
-      "mean_security_per_kw": 55.10,
-      "n": 32
+      "count": 51,
+      "projects_with_security_data": 34,
+      "median_security_per_kw": 86.81,
+      "mean_security_per_kw": 101.03,
+      "n": 34
     },
     "Wind": {
-      "count": 38,
-      "projects_with_security_data": 18,
-      "median_security_per_kw": 61.20,
-      "mean_security_per_kw": 58.90,
-      "n": 18
+      "count": 9,
+      "projects_with_security_data": 5,
+      "median_security_per_kw": 52.13,
+      "mean_security_per_kw": 54.27,
+      "n": 5
     },
     "Gas": {
-      "count": 15,
+      "count": 6,
       "projects_with_security_data": 4,
-      "median_security_per_kw": 42.00,
-      "mean_security_per_kw": 45.30,
+      "median_security_per_kw": 69.56,
+      "mean_security_per_kw": 73.5,
       "n": 4
+    },
+    "Battery": {
+      "count": 66,
+      "projects_with_security_data": 35,
+      "median_security_per_kw": 58.54,
+      "mean_security_per_kw": 61.07,
+      "n": 35
     }
   },
   "by_zone": {
-    "WEST": {
-      "count": 45,
-      "projects_with_security_data": 35,
-      "median_security_per_kw": 44.20,
-      "mean_security_per_kw": 46.50,
-      "n": 35
-    },
-    "COAST": {
-      "count": 38,
-      "projects_with_security_data": 22,
-      "median_security_per_kw": 51.80,
-      "mean_security_per_kw": 54.20,
-      "n": 22
-    },
     "SOUTH": {
-      "count": 25,
-      "projects_with_security_data": 15,
-      "median_security_per_kw": 48.90,
-      "mean_security_per_kw": 50.10,
-      "n": 15
+      "count": 29,
+      "projects_with_security_data": 14,
+      "median_security_per_kw": 68.03,
+      "mean_security_per_kw": 75.71,
+      "n": 14
     },
     "NORTH": {
-      "count": 20,
-      "projects_with_security_data": 8,
-      "median_security_per_kw": 55.60,
-      "mean_security_per_kw": 57.30,
-      "n": 8
+      "count": 36,
+      "projects_with_security_data": 31,
+      "median_security_per_kw": 78.55,
+      "mean_security_per_kw": 100.05,
+      "n": 31
+    },
+    "OTHER": {
+      "count": 3,
+      "projects_with_security_data": 3,
+      "median_security_per_kw": 40.27,
+      "mean_security_per_kw": 45.53,
+      "n": 3
+    },
+    "COAST": {
+      "count": 45,
+      "projects_with_security_data": 24,
+      "median_security_per_kw": 37.78,
+      "mean_security_per_kw": 58.62,
+      "n": 24
+    },
+    "WEST": {
+      "count": 17,
+      "projects_with_security_data": 5,
+      "median_security_per_kw": 47.77,
+      "mean_security_per_kw": 82.57,
+      "n": 5
     },
     "PANHANDLE": {
-      "count": 5,
-      "projects_with_security_data": 2,
-      "median_security_per_kw": 38.50,
-      "mean_security_per_kw": 40.20,
-      "n": 2
+      "count": 2,
+      "projects_with_security_data": 1,
+      "median_security_per_kw": 20.0,
+      "mean_security_per_kw": 20.0,
+      "n": 1
     }
   },
   "tsp_rankings": [
     {
-      "rank": 1,
-      "tsp": "TNMP",
-      "avg_security_per_kw": 68.40,
-      "median_security_per_kw": 65.20,
-      "project_count": 12,
-      "n": 8
+      "tsp": "ETT",
+      "avg_security_per_kw": 193.23,
+      "median_security_per_kw": 193.23,
+      "project_count": 7,
+      "n": 1,
+      "rank": 1
     },
     {
-      "rank": 2,
-      "tsp": "LCRA",
-      "avg_security_per_kw": 58.90,
-      "median_security_per_kw": 56.40,
-      "project_count": 8,
-      "n": 5
-    },
-    {
-      "rank": 3,
-      "tsp": "AEP",
-      "avg_security_per_kw": 54.30,
-      "median_security_per_kw": 52.80,
-      "project_count": 18,
-      "n": 12
-    },
-    {
-      "rank": 4,
       "tsp": "ONCOR",
-      "avg_security_per_kw": 52.30,
-      "median_security_per_kw": 50.10,
-      "project_count": 45,
-      "n": 32
+      "avg_security_per_kw": 93.4,
+      "median_security_per_kw": 72.05,
+      "project_count": 39,
+      "n": 36,
+      "rank": 2
     },
     {
-      "rank": 5,
+      "tsp": "LONE STAR",
+      "avg_security_per_kw": 80.53,
+      "median_security_per_kw": 80.53,
+      "project_count": 7,
+      "n": 1,
+      "rank": 3
+    },
+    {
+      "tsp": "Rayburn Country Electric Cooperative, Inc.",
+      "avg_security_per_kw": 73.75,
+      "median_security_per_kw": 73.75,
+      "project_count": 2,
+      "n": 2,
+      "rank": 4
+    },
+    {
       "tsp": "CENTERPOINT",
-      "avg_security_per_kw": 48.60,
-      "median_security_per_kw": 46.90,
-      "project_count": 38,
-      "n": 20
+      "avg_security_per_kw": 64.9,
+      "median_security_per_kw": 55.08,
+      "project_count": 36,
+      "n": 32,
+      "rank": 5
     },
     {
-      "rank": 6,
-      "tsp": "AUSTIN ENERGY",
-      "avg_security_per_kw": 42.10,
-      "median_security_per_kw": 40.50,
-      "project_count": 6,
-      "n": 3
-    },
-    {
-      "rank": 7,
-      "tsp": "RAYBURN",
-      "avg_security_per_kw": 39.80,
-      "median_security_per_kw": 38.20,
+      "tsp": "CPS",
+      "avg_security_per_kw": 53.31,
+      "median_security_per_kw": 30.08,
       "project_count": 4,
-      "n": 2
+      "n": 3,
+      "rank": 6
+    },
+    {
+      "tsp": "AEP",
+      "avg_security_per_kw": 39.17,
+      "median_security_per_kw": 32.12,
+      "project_count": 16,
+      "n": 3,
+      "rank": 7
     }
   ],
   "developer_analysis": {
     "multi_zone_developers": {
-      "INTERSECT": ["WEST", "COAST"],
-      "NEXTERA": ["WEST", "NORTH", "COAST"],
-      "INVENERGY": ["WEST", "SOUTH"],
-      "ENEL": ["COAST", "SOUTH"],
-      "RWE": ["WEST", "PANHANDLE"],
-      "PATTERN": ["WEST", "NORTH"]
+      "SUNCHASE": [
+        "COAST",
+        "NORTH"
+      ],
+      "ENGIE": [
+        "NORTH",
+        "SOUTH"
+      ]
     },
     "diversified_portfolios": [
       {
-        "developer": "NEXTERA",
-        "technologies": ["Battery", "Solar", "Wind"],
-        "project_count": 12,
-        "n": 12
-      },
-      {
-        "developer": "INTERSECT",
-        "technologies": ["Battery", "Solar"],
-        "project_count": 8,
-        "n": 8
-      },
-      {
-        "developer": "INVENERGY",
-        "technologies": ["Solar", "Wind"],
-        "project_count": 6,
-        "n": 6
-      },
-      {
-        "developer": "RWE",
-        "technologies": ["Solar", "Wind"],
-        "project_count": 5,
-        "n": 5
-      },
-      {
-        "developer": "ENEL",
-        "technologies": ["Battery", "Solar"],
-        "project_count": 4,
-        "n": 4
+        "developer": "ENGIE",
+        "technologies": [
+          "Battery",
+          "Solar"
+        ],
+        "project_count": 2,
+        "n": 2
       }
     ]
   },
   "geographic_concentration": [
-    {"county": "Haskell", "project_count": 12, "zone": "WEST", "n": 12},
-    {"county": "Harris", "project_count": 10, "zone": "COAST", "n": 10},
-    {"county": "Pecos", "project_count": 9, "zone": "WEST", "n": 9},
-    {"county": "Webb", "project_count": 8, "zone": "SOUTH", "n": 8},
-    {"county": "Ector", "project_count": 7, "zone": "WEST", "n": 7},
-    {"county": "Brazoria", "project_count": 6, "zone": "COAST", "n": 6},
-    {"county": "Reeves", "project_count": 6, "zone": "WEST", "n": 6},
-    {"county": "Bexar", "project_count": 5, "zone": "SOUTH", "n": 5},
-    {"county": "Dallas", "project_count": 4, "zone": "NORTH", "n": 4},
-    {"county": "Tarrant", "project_count": 4, "zone": "NORTH", "n": 4}
-  ],
-  "specific_developers": {
-    "RWE": {
+    {
+      "county": "Brazoria",
+      "project_count": 19,
+      "zone": "COAST",
+      "n": 19
+    },
+    {
+      "county": "Harris",
+      "project_count": 6,
+      "zone": "COAST",
+      "n": 6
+    },
+    {
+      "county": "Wharton",
+      "project_count": 6,
+      "zone": "SOUTH",
+      "n": 6
+    },
+    {
+      "county": "Milam",
+      "project_count": 6,
+      "zone": "SOUTH",
+      "n": 6
+    },
+    {
+      "county": "Fort Bend",
       "project_count": 5,
-      "projects_with_security_data": 3,
-      "median_security_per_kw": 58.40,
-      "mean_security_per_kw": 56.80,
-      "vs_corpus_median": "+20.4%",
-      "assessment": "ABOVE_MARKET",
+      "zone": "COAST",
+      "n": 5
+    },
+    {
+      "county": "Jones",
+      "project_count": 4,
+      "zone": "WEST",
+      "n": 4
+    },
+    {
+      "county": "Hill",
+      "project_count": 4,
+      "zone": "NORTH",
+      "n": 4
+    },
+    {
+      "county": "Haskell",
+      "project_count": 4,
+      "zone": "WEST",
+      "n": 4
+    },
+    {
+      "county": "Bell",
+      "project_count": 4,
+      "zone": "NORTH",
+      "n": 4
+    },
+    {
+      "county": "Matagorda",
+      "project_count": 3,
+      "zone": "COAST",
       "n": 3
     },
-    "NEXTERA": {
-      "project_count": 12,
-      "projects_with_security_data": 8,
-      "median_security_per_kw": 52.10,
-      "mean_security_per_kw": 54.30,
-      "vs_corpus_median": "+7.4%",
-      "assessment": "ABOVE_MARKET",
-      "n": 8
+    {
+      "county": "Bexar",
+      "project_count": 3,
+      "zone": "SOUTH",
+      "n": 3
+    },
+    {
+      "county": "Galveston",
+      "project_count": 3,
+      "zone": "COAST",
+      "n": 3
+    },
+    {
+      "county": "Webb",
+      "project_count": 3,
+      "zone": "SOUTH",
+      "n": 3
+    },
+    {
+      "county": "San Patricio",
+      "project_count": 3,
+      "zone": "COAST",
+      "n": 3
+    },
+    {
+      "county": "Hopkins",
+      "project_count": 3,
+      "zone": "NORTH",
+      "n": 3
+    },
+    {
+      "county": "Hidalgo",
+      "project_count": 3,
+      "zone": "SOUTH",
+      "n": 3
+    },
+    {
+      "county": "Chambers",
+      "project_count": 2,
+      "zone": "OTHER",
+      "n": 2
+    },
+    {
+      "county": "Kaufman",
+      "project_count": 2,
+      "zone": "NORTH",
+      "n": 2
+    },
+    {
+      "county": "Leon",
+      "project_count": 2,
+      "zone": "NORTH",
+      "n": 2
+    },
+    {
+      "county": "Freestone",
+      "project_count": 2,
+      "zone": "NORTH",
+      "n": 2
     }
-  },
+  ],
+  "specific_developers": {},
   "data_quality": {
     "low_sample_warnings": [
+      {
+        "category": "fuel_type",
+        "bucket": "Wind",
+        "sample_size": 5,
+        "warning": "Low sample size (n=5 < 10)"
+      },
       {
         "category": "fuel_type",
         "bucket": "Gas",
@@ -224,47 +308,59 @@
       },
       {
         "category": "zone",
-        "bucket": "PANHANDLE",
-        "sample_size": 2,
-        "warning": "Low sample size (n=2 < 10)"
-      },
-      {
-        "category": "zone",
-        "bucket": "NORTH",
-        "sample_size": 8,
-        "warning": "Low sample size (n=8 < 10)"
-      },
-      {
-        "category": "tsp",
-        "bucket": "TNMP",
-        "sample_size": 8,
-        "warning": "Low sample size (n=8 < 10)"
-      },
-      {
-        "category": "tsp",
-        "bucket": "LCRA",
-        "sample_size": 5,
-        "warning": "Low sample size (n=5 < 10)"
-      },
-      {
-        "category": "specific_developer",
-        "bucket": "RWE",
+        "bucket": "OTHER",
         "sample_size": 3,
         "warning": "Low sample size (n=3 < 10)"
       },
       {
-        "category": "specific_developer",
-        "bucket": "NEXTERA",
-        "sample_size": 8,
-        "warning": "Low sample size (n=8 < 10)"
+        "category": "zone",
+        "bucket": "WEST",
+        "sample_size": 5,
+        "warning": "Low sample size (n=5 < 10)"
+      },
+      {
+        "category": "zone",
+        "bucket": "PANHANDLE",
+        "sample_size": 1,
+        "warning": "Low sample size (n=1 < 10)"
+      },
+      {
+        "category": "tsp",
+        "bucket": "ETT",
+        "sample_size": 1,
+        "warning": "Low sample size (n=1 < 10)"
+      },
+      {
+        "category": "tsp",
+        "bucket": "LONE STAR",
+        "sample_size": 1,
+        "warning": "Low sample size (n=1 < 10)"
+      },
+      {
+        "category": "tsp",
+        "bucket": "Rayburn Country Electric Cooperative, Inc.",
+        "sample_size": 2,
+        "warning": "Low sample size (n=2 < 10)"
+      },
+      {
+        "category": "tsp",
+        "bucket": "CPS",
+        "sample_size": 3,
+        "warning": "Low sample size (n=3 < 10)"
+      },
+      {
+        "category": "tsp",
+        "bucket": "AEP",
+        "sample_size": 3,
+        "warning": "Low sample size (n=3 < 10)"
       }
     ],
     "missing_data_warnings": [
       {
         "field": "security_per_kw",
-        "missing_count": 51,
-        "missing_pct": 38.3,
-        "warning": "38.3% of projects missing security_per_kw data"
+        "missing_count": 54,
+        "missing_pct": 40.9,
+        "warning": "40.9% of projects missing security_per_kw data"
       }
     ]
   }
