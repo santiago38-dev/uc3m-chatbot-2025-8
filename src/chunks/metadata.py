@@ -61,6 +61,9 @@ PARENT_MAPPING = {
     'JUPITER': ['jupiter power', 'jupiter '],
     'ABLE GRID': ['able grid'],
     'GIGA TEXAS': ['giga texas'],
+    'SAMSUNG': ['samsung', 'samsung c&t', 'samsung sdi', 'samsung engineering'],
+    'HANWHA': ['hanwha', 'hanwha energy', 'hanwha q cells'],
+    'SK': ['sk e&s', 'sk energy'],
 
     # Tier 4: Utilities & IPPs
     'VISTRA': ['vistra'],

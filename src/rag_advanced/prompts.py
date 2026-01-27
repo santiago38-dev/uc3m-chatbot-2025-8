@@ -41,6 +41,14 @@ RULES:
 - Do NOT include meta-commentary about what I removed or changed
 - Do NOT hallucinate specific numbers, dates, or names not in the context
 
+CRITICAL GROUNDING RULES:
+- ONLY use information from the provided context documents
+- Do NOT cite external sources (Wood Mackenzie, BloombergNEF, industry reports, etc.)
+- Do NOT reference general industry knowledge or training data
+- Do NOT make up benchmark ranges or market averages not in the documents
+- If asked about industry benchmarks, only provide data if it appears in the context
+- Every number, date, and fact MUST be traceable to a specific [Source N]
+
 Context:
 {context}"""
 
@@ -51,11 +59,18 @@ FIELDS TO EXTRACT:
 - project_name: Specific project names (e.g. "Willow Beach Wind", "Stoneridge", "Blue Summit")
 - inr: Interconnection Request numbers (e.g. "25INR0494", "22INR0111")
 - developer_spv: Developer SPV names (e.g. "ACE DevCo", "Capital Wind")
-- parent_company: Parent companies (e.g. "NextEra", "CenterPoint", "RWE")
+- parent_company: Energy developers/owners (e.g. "NextEra", "RWE", "Invenergy", "Samsung", "EDF")
+- tsp_normalized: Transmission Service Providers (e.g. "ONCOR", "CENTERPOINT", "AEP TEXAS", "TNMP", "ETT", "LCRA TSC")
 - county: Texas counties (e.g. "Brazoria", "Harris")
-- zone: ERCOT Zones (NORTH, SOUTH, WEST, COAST, PANHANDLE)
+- zone: ERCOT Zones (NORTH, SOUTH, WEST, COAST, PANHANDLE, CENTRAL)
 - technology: 'WT' (Wind), 'PV' (Solar), 'BA' (Battery/Storage), 'GAS' (Gas)
 - fuel_type: 'WIN' (Wind), 'SOL' (Solar), 'OTH' (Storage), 'GAS' (Gas)
+
+CRITICAL DISTINCTIONS:
+- TSPs are transmission utilities: ONCOR, CENTERPOINT, AEP TEXAS, TNMP, ETT, LCRA TSC
+- Parent companies are energy developers: NextEra, RWE, Invenergy, Samsung, EDF, Engie, Enel
+- Do NOT confuse these! "ONCOR agreement" refers to TSP, not parent_company
+- If query mentions "ONCOR projects" or "Centerpoint interconnection", set tsp_normalized (not parent_company)
 
 GUIDELINES:
 - If a project name is mentioned (e.g. "Willow Beach"), extract it as 'project_name'.
@@ -105,6 +120,14 @@ REGLAS:
 - Cuando los datos varíen entre fuentes, reporta el rango y cita todas las fuentes
 - NO incluyas meta-comentarios sobre lo que eliminaste o cambiaste
 - NO inventes números, fechas o nombres específicos que no estén en el contexto
+
+REGLAS CRÍTICAS DE FUNDAMENTACIÓN:
+- USA ÚNICAMENTE información de los documentos de contexto proporcionados
+- NO cites fuentes externas (Wood Mackenzie, BloombergNEF, informes de la industria, etc.)
+- NO hagas referencia a conocimiento general de la industria o datos de entrenamiento
+- NO inventes rangos de referencia o promedios de mercado que no estén en los documentos
+- Si preguntan sobre puntos de referencia de la industria, solo proporciona datos si aparecen en el contexto
+- Cada número, fecha y hecho DEBE ser rastreable a una [Fuente N] específica
 
 Contexto:
 {context}"""

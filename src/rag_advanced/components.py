@@ -23,6 +23,11 @@ from .hallucination_guard import (
     validate_response_grounding,
     create_grounding_warning
 )
+from .query_filter_extractor import (
+    extract_query_filters,
+    format_filters_for_logging,
+    validate_retrieved_docs
+)
 
 # --- Domain Filter ---
 
@@ -398,60 +403,41 @@ def expand_query(question: str) -> List[str]:
     return queries
 
 
-def multi_retrieve(queries: List[str], retriever, filters: Dict[str, Any] = None, k: int = None) -> List:
+def multi_retrieve(
+    queries: List[str],
+    retriever,
+    filters: Dict[str, Any] = None,
+    hard_filters: Dict = None,
+    k: int = None
+) -> List:
     """Retrieve documents for multiple queries in parallel and merge results.
 
     Args:
         queries: List of query strings
         retriever: The retriever instance
-        filters: Optional metadata filters to apply/boost
+        filters: Optional metadata filters to apply/boost (soft filtering)
+        hard_filters: Optional ChromaDB where clause for hard pre-filtering
         k: Optional limit of documents per query
     """
     logger = get_logger()
-    logger.step(f"Retrieving documents for {len(queries)} queries in parallel (k={k or 'auto'})...")
+    filter_mode = "hard" if hard_filters else ("boosted" if filters else "none")
+    logger.step(f"Retrieving docs for {len(queries)} queries (k={k or 'auto'}, filter_mode={filter_mode})...")
 
     all_docs = []
     seen_contents = set()
 
     def retrieve_single(query: str) -> List:
-        # If retriever supports 'filters', pass them.
-        # SmartRetriever uses invoke(query), but we can't easily pass kwargs via invoke()
-        # unless we modify SmartRetriever to look for a special query dict or use a different method.
-        # HACK: If filters exist, we can assume the retriever exposes a method to set them
-        # or we rely on the retriever to handle it.
-        # Given we are modifying this, we should assume the retriever is capable.
-
-        # Determine internal K for this specific query if overridden
-        # Standard retriever.invoke(q) doesn't accept k.
-        # We need to rely on the retriever instance if it has search methods.
-
-        current_retriever = retriever
-
-        # If k is provided, we might need to adjust the retriever's k temporarily?
-        # Or call similarity_search directly if it's exposed.
-        # Assuming LangChain retriever, often vectorstore.as_retriever()
-
-        # Using vectorstore directly if accessible (common pattern in custom retrievers)
-        if hasattr(retriever, 'vectorstore'):
-             # Use the underlying vectorstore search if possible to control k
-             if filters:
-                 # Check if our custom SmartRetriever
-                 if hasattr(retriever, 'search_with_filters'):
-                      # SmartRetriever search_with_filters usually respects self.k,
-                      # we may need to hint k if possible, but our implementation currently doesn't allow overriding k in search_with_filters easily
-                      # unless we changed it. Wait, I saw SmartRetriever definition earlier.
-                      # It uses self.k.
-                      pass
-
-        # For now, let's just retrieve and slice manually if the retriever returns more
-
         docs = []
-        if hasattr(retriever, 'search_with_filters'):
-             docs = retriever.search_with_filters(query, filters)
-        else:
-             docs = retriever.invoke(query)
 
-        # Enforce per-query k limit manually here incase retriever returned more
+        # Priority: Hard filters > Soft filters > No filters
+        if hard_filters and hasattr(retriever, 'search_with_hard_filters'):
+            docs = retriever.search_with_hard_filters(query, hard_filters)
+        elif filters and hasattr(retriever, 'search_with_filters'):
+            docs = retriever.search_with_filters(query, filters)
+        else:
+            docs = retriever.invoke(query)
+
+        # Enforce per-query k limit
         if k and len(docs) > k:
             docs = docs[:k]
 
@@ -610,15 +596,28 @@ Please rephrase your question using one of the available {missing_info['label']}
     # 4. Query Expansion
     queries = expand_query(question)
 
-    # 5. Multi-Query Retrieval (with metadata boosting)
+    # 4.5 Extract hard filters for ChromaDB where clause (same as Flash mode)
+    extracted_filters = extract_query_filters(question)
+    hard_where_clause = extracted_filters.to_chromadb_where()
+
+    if not extracted_filters.is_empty():
+        logger.info(f"Thinking filters: {format_filters_for_logging(extracted_filters)}")
+
+    # 5. Multi-Query Retrieval with HARD FILTERING
     # Strategy: Split K total budget across N queries
-    # This prevents expanding context too much with duplicate/irrelevant info from many queries
+    # Hard filters are applied to EXCLUDE non-matching docs (not just boost)
     num_queries = len(queries)
     k_per_query = max(1, max_docs // num_queries) if max_docs else None
 
     logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
 
-    all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
+    all_docs = multi_retrieve(
+        queries,
+        retriever,
+        filters=metadata_filters,  # Soft boosting from LLM extraction
+        hard_filters=hard_where_clause,  # Hard pre-filtering from regex extraction
+        k=k_per_query
+    )
 
     if not all_docs:
         msg = ("No tengo información sobre eso en los documentos disponibles."
@@ -626,6 +625,13 @@ Please rephrase your question using one of the available {missing_info['label']}
                else "I don't have information about that in the available documents.")
         yield msg
         return
+
+    # 5.5 POST-RETRIEVAL VALIDATION: Remove any docs that violate filters
+    if not extracted_filters.is_empty():
+        valid_docs, filter_warnings = validate_retrieved_docs(all_docs, extracted_filters, logger)
+        if filter_warnings:
+            logger.warning(f"Post-validation removed {len(all_docs) - len(valid_docs)} docs that violated filters")
+            all_docs = valid_docs
 
     # Final safety clamp to k_total (in case disjoint sets exceeded total)
     if max_docs and len(all_docs) > max_docs:
