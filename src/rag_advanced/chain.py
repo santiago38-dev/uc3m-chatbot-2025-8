@@ -18,6 +18,9 @@ from .components import (
     is_domain_relevant, contextualize_question,
     generate_flash_response, generate_thinking_response
 )
+from .query_filter_extractor import (
+    extract_query_filters, format_filters_for_logging
+)
 
 # Out-of-scope question messages
 OOS_QUESTION_MSG = {
@@ -49,7 +52,7 @@ def get_flash_chain(
     get_logger().info("Building FLASH mode chain")
 
     def flash_with_domain_filter(input_dict: Dict) -> Generator[str, None, None]:
-        """Flash generator with domain pre-filter."""
+        """Flash generator with domain pre-filter and hard filtering support."""
         logger = get_logger()
         question = input_dict["question"]
         history = input_dict.get("chat_history", [])
@@ -61,10 +64,31 @@ def get_flash_chain(
             yield msg
             return
 
-        # Retrieve documents directly
-        docs = retriever.invoke(question)
+        # Extract filters from query (numeric comparisons, zones, etc.)
+        extracted_filters = extract_query_filters(question)
+        where_clause = extracted_filters.to_chromadb_where()
+
+        # Log what filters were extracted
+        if not extracted_filters.is_empty():
+            logger.info(f"Flash filters: {format_filters_for_logging(extracted_filters)}")
+
+        # Retrieve documents with hard filtering if filters exist
+        if where_clause and hasattr(retriever, 'search_with_hard_filters'):
+            docs = retriever.search_with_hard_filters(question, where_clause)
+            logger.info(f"Hard-filtered retrieval: {len(docs)} docs")
+
+            # If hard filtering returns too few docs, fall back to boosted search
+            if len(docs) < 3:
+                logger.info("Too few hard-filtered results, falling back to boosted search")
+                docs = retriever.search_with_filters(
+                    question,
+                    filters=extracted_filters.equality_filters
+                )
+        else:
+            # No filters or retriever doesn't support hard filtering
+            docs = retriever.invoke(question)
+
         # Use k_total if explicitly passed, otherwise let retriever limit dictate
-        # Since retriever is pre-configured with k, passing max_sources=k_total is redundant but checks bounds
         retrieval = format_sources(docs, max_sources=k_total)
 
         # Generate response

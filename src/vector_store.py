@@ -163,6 +163,10 @@ class SmartRetriever:
     """
     A retriever that uses boosted similarity search based on query metadata.
     Compatible with LCEL through the invoke() method.
+
+    Supports two modes:
+    1. Boosted search (default): Soft filtering via score boosting
+    2. Hard filtered search: Pre-filtering via ChromaDB where clauses
     """
 
     def __init__(
@@ -186,8 +190,48 @@ class SmartRetriever:
         return self._search(query)
 
     def search_with_filters(self, query: str, filters: dict = None) -> list:
-        """Explicitly search with external filters."""
+        """Explicitly search with external filters (boosted, not hard)."""
         return self._search(query, external_filters=filters)
+
+    def search_with_hard_filters(self, query: str, where_clause: dict = None) -> list:
+        """
+        Search with hard pre-filtering using ChromaDB where clauses.
+
+        Unlike boosted search, this EXCLUDES documents that don't match filters.
+        Use for queries with numeric comparisons or strict geographic requirements.
+
+        Args:
+            query: Search query text
+            where_clause: ChromaDB where clause dict, e.g.:
+                {"zone": {"$eq": "WEST"}}
+                {"$and": [{"zone": {"$eq": "WEST"}}, {"security_per_kw": {"$gt": 100}}]}
+
+        Returns:
+            List of matching documents
+        """
+        if not where_clause:
+            # No hard filters, fall back to boosted search
+            return self._search(query)
+
+        try:
+            # Use ChromaDB's filtered similarity search
+            results = self.vectorstore.similarity_search_with_score(
+                query,
+                k=self.k,
+                filter=where_clause
+            )
+
+            # Extract just documents (results are (doc, score) tuples)
+            docs = [doc for doc, score in results]
+
+            # If we got fewer than k results, the filter was too strict
+            # Log this for debugging (caller can check len(results))
+            return docs
+
+        except Exception as e:
+            # If filtering fails, fall back to boosted search
+            print(f"Warning: Hard filter failed ({e}), falling back to boosted search")
+            return self._search(query)
 
     def _search(self, query: str, external_filters: dict = None) -> list:
         """Perform boosted similarity search."""
