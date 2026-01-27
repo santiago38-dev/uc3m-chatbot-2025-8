@@ -98,7 +98,7 @@ def run_question(chain, question_data: dict, session_id: str) -> tuple:
     return full_response, elapsed
 
 
-def run_demo(mode: str = "both"):
+def run_demo(mode: str = "both", pause: bool = False):
     """Run the demo with specified mode(s)."""
 
     print("\n" + "#" * 70)
@@ -132,7 +132,7 @@ def run_demo(mode: str = "both"):
                 "response_length": len(response)
             })
 
-            if i < len(DEMO_QUESTIONS) - 1:
+            if pause and i < len(DEMO_QUESTIONS) - 1:
                 input("\n[Press Enter for next question...]")
 
     # Run Thinking mode
@@ -150,7 +150,7 @@ def run_demo(mode: str = "both"):
                 "response_length": len(response)
             })
 
-            if i < len(DEMO_QUESTIONS) - 1:
+            if pause and i < len(DEMO_QUESTIONS) - 1:
                 input("\n[Press Enter for next question...]")
 
     # Summary
@@ -206,6 +206,11 @@ Examples:
         action="store_true",
         help="Just list the demo questions without running"
     )
+    parser.add_argument(
+        "--pause",
+        action="store_true",
+        help="Pause between questions (press Enter to continue)"
+    )
 
     args = parser.parse_args()
 
@@ -218,7 +223,7 @@ Examples:
         print()
         return
 
-    run_demo(mode=args.mode)
+    run_demo(mode=args.mode, pause=args.pause)
 
 
 if __name__ == "__main__":
