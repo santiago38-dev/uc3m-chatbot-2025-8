@@ -787,9 +787,10 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # 4. Query Expansion
     queries = expand_query(question)
 
-    # 5. Build hard filter for comparative queries
+    # 5. Build hard filter for ANY extracted filters (not just comparative)
+    # This handles: numeric filters (security_per_kw_min), zone filters, etc.
     where_clause = None
-    if is_comparative and extracted_filters:
+    if extracted_filters:
         where_clause = build_chromadb_where_clause(extracted_filters, expand_aliases=True)
         if where_clause:
             logger.info(f"Built ChromaDB where clause: {where_clause}")
@@ -801,9 +802,9 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
 
-    # Use hard filtering for comparative queries if retriever supports it
+    # Use hard filtering if we have a where clause and retriever supports it
     if where_clause and hasattr(retriever, 'search_with_hard_filters'):
-        logger.info("Using HARD filtering mode for comparative query")
+        logger.info("Using HARD filtering mode")
         # For hard filtering, we retrieve with the filter applied
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
     else:
