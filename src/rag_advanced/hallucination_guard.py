@@ -10,6 +10,7 @@ Two main functions:
 import re
 from typing import Dict, List, Tuple, Set
 from src.vector_store import get_vectorstore
+from src.chunks.metadata import PARENT_MAPPING  # Use existing ERCOT developer aliases
 
 
 def get_corpus_metadata_values(field: str) -> Set[str]:
@@ -51,6 +52,8 @@ def fuzzy_match(query: str, corpus_values: Set[str]) -> Tuple[bool, str]:
     - "NEXTERA" matching "NEXTERA ENERGY RESOURCES"
     - "RWE" matching "RWE SOLAR DEVELOPMENT"
 
+    Uses PARENT_MAPPING from metadata.py for comprehensive ERCOT developer aliases.
+
     Returns:
         Tuple of (found: bool, matched_value: str or None)
     """
@@ -70,19 +73,22 @@ def fuzzy_match(query: str, corpus_values: Set[str]) -> Tuple[bool, str]:
         if cv in query:
             return True, cv
 
-    # Common variations/aliases
-    aliases = {
-        "NEXTERA": ["NEXTERA ENERGY", "NEXTERA RESOURCES", "FPL", "FLORIDA POWER"],
-        "RWE": ["RWE SOLAR", "RWE RENEWABLES", "RWE CLEAN ENERGY"],
-        "SAMSUNG": ["SAMSUNG C&T", "SAMSUNG SDI"],
-        "CENTERPOINT": ["CENTERPOINT ENERGY", "CNP"],
-        "ONCOR": ["ONCOR ELECTRIC"],
-    }
-
-    if query in aliases:
-        for alias in aliases[query]:
+    # Use PARENT_MAPPING from metadata.py for ERCOT-specific developer aliases
+    # PARENT_MAPPING format: {"NEXTERA": ["nextera", "fpl", ...], "RWE": ["rwe", "e.on", ...]}
+    if query in PARENT_MAPPING:
+        aliases = [a.upper() for a in PARENT_MAPPING[query]]
+        for alias in aliases:
             for cv in corpus_values:
                 if alias in cv or cv in alias:
+                    return True, cv
+
+    # Also check reverse: if query matches any alias, find the parent company
+    for parent, aliases in PARENT_MAPPING.items():
+        aliases_upper = [a.upper() for a in aliases]
+        if query.lower() in aliases or any(query in a.upper() for a in aliases):
+            # Query matches an alias, check if parent is in corpus
+            for cv in corpus_values:
+                if parent in cv or cv in parent:
                     return True, cv
 
     return False, None
