@@ -146,14 +146,76 @@ def test_full_chain(question: str, mode: str = "flash", verbose: bool = False):
     return response
 
 
+def test_all_questions(mode: str = "flash", verbose: bool = False):
+    """Test all questions with specified mode."""
+    print("\n" + "=" * 70)
+    print(f"TESTING ALL QUESTIONS - {mode.upper()} MODE")
+    print("=" * 70)
+
+    results = {}
+    for qid, question in TEST_QUESTIONS.items():
+        print(f"\n{'='*70}")
+        print(f"{qid}: {question}")
+        print("=" * 70)
+
+        try:
+            response = test_full_chain(question, mode=mode, verbose=verbose)
+            results[qid] = {"status": "OK", "response_len": len(response)}
+        except Exception as e:
+            results[qid] = {"status": "ERROR", "error": str(e)}
+            print(f"ERROR: {e}")
+
+        print("\n" + "-" * 70)
+
+    # Summary
+    print("\n" + "=" * 70)
+    print("SUMMARY")
+    print("=" * 70)
+    for qid, result in results.items():
+        status = "✅" if result["status"] == "OK" else "❌"
+        print(f"  {qid}: {status} {result['status']}")
+
+    return results
+
+
+def test_all_modes(verbose: bool = False):
+    """Test all questions with BOTH flash and thinking modes."""
+    print("\n" + "=" * 70)
+    print("TESTING ALL QUESTIONS - BOTH MODES")
+    print("=" * 70)
+
+    all_results = {}
+
+    for mode in ["flash", "thinking"]:
+        print(f"\n\n{'#'*70}")
+        print(f"# {mode.upper()} MODE")
+        print(f"{'#'*70}")
+        all_results[mode] = test_all_questions(mode=mode, verbose=verbose)
+
+    # Final comparison
+    print("\n\n" + "=" * 70)
+    print("FINAL COMPARISON")
+    print("=" * 70)
+    print(f"{'Question':<10} {'Flash':<15} {'Thinking':<15}")
+    print("-" * 40)
+    for qid in TEST_QUESTIONS.keys():
+        flash_status = "✅" if all_results["flash"].get(qid, {}).get("status") == "OK" else "❌"
+        think_status = "✅" if all_results["thinking"].get(qid, {}).get("status") == "OK" else "❌"
+        print(f"{qid:<10} {flash_status:<15} {think_status:<15}")
+
+    return all_results
+
+
 def main():
     parser = argparse.ArgumentParser(description="Test ERCOT RAG comparative queries")
-    parser.add_argument("--mode", choices=["flash", "thinking"], default="flash",
-                        help="RAG mode to use")
+    parser.add_argument("--mode", choices=["flash", "thinking", "both"], default="flash",
+                        help="RAG mode to use (both = test flash AND thinking)")
     parser.add_argument("--question", "-q", type=str,
                         help="Custom question to test")
     parser.add_argument("--test", "-t", choices=["Q1", "Q2", "Q3", "Q4", "Q5", "Q6"],
                         help="Run specific test question")
+    parser.add_argument("--all", "-a", action="store_true",
+                        help="Run ALL test questions")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Verbose output")
     parser.add_argument("--filters-only", action="store_true",
@@ -166,6 +228,14 @@ def main():
     # Filter extraction test
     if args.filters_only:
         test_filter_extraction()
+        return
+
+    # Run all questions
+    if args.all:
+        if args.mode == "both":
+            test_all_modes(verbose=args.verbose)
+        else:
+            test_all_questions(mode=args.mode, verbose=args.verbose)
         return
 
     # Determine question to test
@@ -182,8 +252,14 @@ def main():
         test_retrieval(question, verbose=args.verbose)
         return
 
-    # Full chain test
-    test_full_chain(question, mode=args.mode, verbose=args.verbose)
+    # Full chain test - support "both" mode for single question too
+    if args.mode == "both":
+        print("Testing with FLASH mode:")
+        test_full_chain(question, mode="flash", verbose=args.verbose)
+        print("\n\nTesting with THINKING mode:")
+        test_full_chain(question, mode="thinking", verbose=args.verbose)
+    else:
+        test_full_chain(question, mode=args.mode, verbose=args.verbose)
 
 
 if __name__ == "__main__":
