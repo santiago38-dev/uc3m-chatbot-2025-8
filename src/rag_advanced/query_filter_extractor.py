@@ -14,13 +14,14 @@ Handles:
 3. Fuel type filters: "battery storage", "solar projects", "wind farms"
 4. TSP filters: "ONCOR", "Centerpoint", "ETT"
 5. Developer filters: "RWE projects", "Samsung battery"
+6. COMPARATIVE QUERIES: "X vs Y", "compare A and B" -> extract BOTH entities
 
 Returns ChromaDB-compatible where clauses for hard pre-filtering.
 """
 
 import re
-from typing import Dict, Any, List, Optional, Tuple, Set
-from dataclasses import dataclass
+from typing import Dict, Any, List, Optional, Tuple, Set, Union
+from dataclasses import dataclass, field
 
 # Import source of truth
 from src.chunks.metadata import COUNTY_ZONES, PARENT_MAPPING
@@ -36,17 +37,27 @@ class NumericFilter:
 
 @dataclass
 class ExtractedFilters:
-    """Container for all extracted filters."""
-    equality_filters: Dict[str, str]  # field -> value (exact match)
-    numeric_filters: List[NumericFilter]  # numeric comparisons
+    """Container for all extracted filters - supports multi-value for comparisons."""
+    # field -> single value OR list of values for comparisons
+    equality_filters: Dict[str, Union[str, List[str]]] = field(default_factory=dict)
+    numeric_filters: List[NumericFilter] = field(default_factory=list)
+    is_comparative: bool = False  # Flag for comparative queries
 
     def to_chromadb_where(self) -> Optional[Dict]:
-        """Convert to ChromaDB where clause format."""
+        """Convert to ChromaDB where clause format.
+
+        Uses $in operator for multi-value filters (comparative queries).
+        """
         conditions = []
 
         # Add equality filters
-        for field, value in self.equality_filters.items():
-            conditions.append({field: {"$eq": value}})
+        for fld, value in self.equality_filters.items():
+            if isinstance(value, list):
+                # Multi-value: use $in operator
+                conditions.append({fld: {"$in": value}})
+            else:
+                # Single value: use $eq
+                conditions.append({fld: {"$eq": value}})
 
         # Add numeric filters
         for nf in self.numeric_filters:
@@ -65,49 +76,67 @@ class ExtractedFilters:
 
 
 # =============================================================================
+# COMPARATIVE QUERY DETECTION
+# =============================================================================
+
+COMPARATIVE_PATTERNS = [
+    r'\bcompare\b',
+    r'\bcomparison\b',
+    r'\bvs\.?\b',
+    r'\bversus\b',
+    r'\band\b.*\bprojects?\b',  # "RWE and SAMSUNG projects"
+    r'\bbetween\b',
+    r'\bdifference\s+between\b',
+]
+
+
+def is_comparative_query(query: str) -> bool:
+    """Detect if query is comparing multiple entities."""
+    q_lower = query.lower()
+    return any(re.search(p, q_lower) for p in COMPARATIVE_PATTERNS)
+
+
+# =============================================================================
 # ZONE DETECTION - Uses COUNTY_ZONES as source of truth
 # =============================================================================
 
-# Valid zones from COUNTY_ZONES (deduplicated)
-VALID_ZONES: Set[str] = set(COUNTY_ZONES.values())  # {'WEST', 'PANHANDLE', 'COAST', 'NORTH', 'SOUTH', 'CENTRAL'}
+VALID_ZONES: Set[str] = set(COUNTY_ZONES.values())
 
 # Zone keyword mappings - ORDER MATTERS: specific zones first, then general
-# PANHANDLE is checked before WEST because Panhandle is geographically in "West Texas"
 ZONE_KEYWORDS = [
-    # Most specific first (cities/regions that are unambiguous)
     ("PANHANDLE", ["panhandle", "amarillo", "lubbock"]),
     ("COAST", ["coast", "coastal", "houston", "gulf", "galveston", "brazoria", "corpus christi"]),
     ("NORTH", ["north texas", "north tx", "dallas", "dfw", "fort worth", "tarrant"]),
     ("SOUTH", ["south texas", "south tx", "san antonio", "rio grande", "laredo", "valley"]),
     ("CENTRAL", ["central texas", "central tx", "austin", "waco", "temple"]),
-    # WEST is last because "west texas" is a broad term that could include Panhandle
     ("WEST", ["west texas", "west tx", "western texas", "permian", "midland", "odessa", "pecos"]),
 ]
 
 
-def extract_zone(query: str) -> Optional[str]:
-    """
-    Extract zone from query using keyword matching.
-
-    Priority: More specific zones (PANHANDLE, COAST) checked before general (WEST).
-    This prevents "West Texas near Amarillo" from matching WEST instead of PANHANDLE.
-    """
+def extract_zones(query: str) -> List[str]:
+    """Extract ALL matching zones from query (for comparative queries)."""
     q_lower = query.lower()
+    found = []
 
-    # Check in priority order (specific to general)
     for zone, keywords in ZONE_KEYWORDS:
         for kw in keywords:
-            if kw in q_lower:
-                return zone
+            if kw in q_lower and zone not in found:
+                found.append(zone)
+                break  # Only add each zone once
 
-    return None
+    return found
+
+
+def extract_zone(query: str) -> Optional[str]:
+    """Extract single zone (first match) - backwards compatibility."""
+    zones = extract_zones(query)
+    return zones[0] if zones else None
 
 
 # =============================================================================
 # FUEL TYPE DETECTION
 # =============================================================================
 
-# Fuel type codes from ERCOT
 FUEL_TYPE_KEYWORDS = {
     "OTH": ["battery", "bess", "storage", "energy storage", "battery storage"],
     "SOL": ["solar", "pv", "photovoltaic", "solar farm", "solar project"],
@@ -116,23 +145,30 @@ FUEL_TYPE_KEYWORDS = {
 }
 
 
-def extract_fuel_type(query: str) -> Optional[str]:
-    """Extract fuel type from query using keyword matching."""
+def extract_fuel_types(query: str) -> List[str]:
+    """Extract ALL matching fuel types from query (for comparative queries)."""
     q_lower = query.lower()
+    found = []
 
     for fuel_type, keywords in FUEL_TYPE_KEYWORDS.items():
         for kw in keywords:
-            if kw in q_lower:
-                return fuel_type
+            if kw in q_lower and fuel_type not in found:
+                found.append(fuel_type)
+                break
 
-    return None
+    return found
+
+
+def extract_fuel_type(query: str) -> Optional[str]:
+    """Extract single fuel type - backwards compatibility."""
+    types = extract_fuel_types(query)
+    return types[0] if types else None
 
 
 # =============================================================================
 # TSP DETECTION
 # =============================================================================
 
-# TSP normalized names (must match ChromaDB field tsp_normalized)
 TSP_KEYWORDS = {
     "ONCOR": ["oncor"],
     "CENTERPOINT": ["centerpoint", "center point", "cnp"],
@@ -143,52 +179,62 @@ TSP_KEYWORDS = {
 }
 
 
-def extract_tsp(query: str) -> Optional[str]:
-    """Extract TSP from query using keyword matching."""
+def extract_tsps(query: str) -> List[str]:
+    """Extract ALL matching TSPs from query (for comparative queries)."""
     q_lower = query.lower()
+    found = []
 
     for tsp, keywords in TSP_KEYWORDS.items():
         for kw in keywords:
-            # Use word boundary to avoid partial matches
-            if re.search(rf'\b{re.escape(kw)}\b', q_lower):
-                return tsp
+            if re.search(rf'\b{re.escape(kw)}\b', q_lower) and tsp not in found:
+                found.append(tsp)
+                break
 
-    return None
+    return found
+
+
+def extract_tsp(query: str) -> Optional[str]:
+    """Extract single TSP - backwards compatibility."""
+    tsps = extract_tsps(query)
+    return tsps[0] if tsps else None
 
 
 # =============================================================================
 # DEVELOPER DETECTION - Uses PARENT_MAPPING as source of truth
 # =============================================================================
 
-def extract_developer(query: str) -> Optional[str]:
-    """
-    Extract developer/parent company from query.
-
-    Uses PARENT_MAPPING from metadata.py as source of truth.
-    """
+def extract_developers(query: str) -> List[str]:
+    """Extract ALL matching developers from query (for comparative queries)."""
     q_upper = query.upper()
+    found = []
 
     # Check for parent company names directly
     for parent in PARENT_MAPPING.keys():
-        if parent in q_upper:
-            return parent
+        if parent in q_upper and parent not in found:
+            found.append(parent)
 
     # Check for aliases
     for parent, aliases in PARENT_MAPPING.items():
-        for alias in aliases:
-            if alias.upper() in q_upper:
-                return parent
+        if parent not in found:
+            for alias in aliases:
+                if alias.upper() in q_upper:
+                    found.append(parent)
+                    break
 
-    return None
+    return found
+
+
+def extract_developer(query: str) -> Optional[str]:
+    """Extract single developer - backwards compatibility."""
+    devs = extract_developers(query)
+    return devs[0] if devs else None
 
 
 # =============================================================================
 # NUMERIC FILTER DETECTION
 # =============================================================================
 
-# Numeric field patterns
 NUMERIC_PATTERNS = [
-    # Security per kW patterns
     (r'(?:>|greater\s+than|above|more\s+than|over|exceeds?)\s*\$?\s*(\d+(?:\.\d+)?)\s*(?:/kw|per\s*kw)?',
      '$gt', 'security_per_kw'),
     (r'(?:>=|at\s+least)\s*\$?\s*(\d+(?:\.\d+)?)\s*(?:/kw|per\s*kw)?',
@@ -197,7 +243,6 @@ NUMERIC_PATTERNS = [
      '$lt', 'security_per_kw'),
     (r'(?:<=|at\s+most|up\s+to)\s*\$?\s*(\d+(?:\.\d+)?)\s*(?:/kw|per\s*kw)?',
      '$lte', 'security_per_kw'),
-    # Capacity patterns
     (r'(?:>|greater\s+than|above|more\s+than|over)\s*(\d+(?:\.\d+)?)\s*(?:mw|megawatt)',
      '$gt', 'capacity_mw'),
     (r'(?:<|less\s+than|under|below)\s*(\d+(?:\.\d+)?)\s*(?:mw|megawatt)',
@@ -210,11 +255,11 @@ def extract_numeric_filters(query: str) -> List[NumericFilter]:
     filters = []
     q_lower = query.lower()
 
-    for pattern, operator, field in NUMERIC_PATTERNS:
+    for pattern, operator, fld in NUMERIC_PATTERNS:
         match = re.search(pattern, q_lower, re.IGNORECASE)
         if match:
             value = float(match.group(1))
-            filters.append(NumericFilter(field=field, operator=operator, value=value))
+            filters.append(NumericFilter(field=fld, operator=operator, value=value))
 
     return filters
 
@@ -227,6 +272,9 @@ def extract_query_filters(query: str) -> ExtractedFilters:
     """
     Extract all filters from a natural language query.
 
+    For comparative queries ("X vs Y", "compare A and B"), extracts MULTIPLE
+    entities and uses $in operator for ChromaDB filtering.
+
     Args:
         query: Natural language question
 
@@ -237,43 +285,45 @@ def extract_query_filters(query: str) -> ExtractedFilters:
         "battery storage in West Texas"
             -> zone=WEST, fuel_type=OTH
 
-        "security above $100/kW"
-            -> security_per_kw > 100
+        "Compare RWE and SAMSUNG battery projects"
+            -> parent_company IN [RWE, SAMSUNG], fuel_type=OTH
 
-        "ONCOR solar projects under $50/kW"
-            -> tsp_normalized=ONCOR, fuel_type=SOL, security_per_kw < 50
+        "ONCOR vs Centerpoint force majeure"
+            -> tsp_normalized IN [ONCOR, CENTERPOINT]
 
-        "wind farms in the Panhandle"
-            -> zone=PANHANDLE, fuel_type=WIN
+        "battery vs solar security costs"
+            -> fuel_type IN [OTH, SOL]
     """
-    equality_filters = {}
+    comparative = is_comparative_query(query)
+    equality_filters: Dict[str, Union[str, List[str]]] = {}
 
-    # Extract zone (priority order handles ambiguity)
-    zone = extract_zone(query)
-    if zone:
-        equality_filters['zone'] = zone
+    # Extract zones
+    zones = extract_zones(query)
+    if zones:
+        equality_filters['zone'] = zones if (comparative and len(zones) > 1) else zones[0]
 
-    # Extract fuel type
-    fuel_type = extract_fuel_type(query)
-    if fuel_type:
-        equality_filters['fuel_type'] = fuel_type
+    # Extract fuel types - for comparatives, include all mentioned
+    fuel_types = extract_fuel_types(query)
+    if fuel_types:
+        equality_filters['fuel_type'] = fuel_types if (comparative and len(fuel_types) > 1) else fuel_types[0]
 
-    # Extract TSP
-    tsp = extract_tsp(query)
-    if tsp:
-        equality_filters['tsp_normalized'] = tsp
+    # Extract TSPs - for comparatives, include all mentioned
+    tsps = extract_tsps(query)
+    if tsps:
+        equality_filters['tsp_normalized'] = tsps if (comparative and len(tsps) > 1) else tsps[0]
 
-    # Extract developer
-    developer = extract_developer(query)
-    if developer:
-        equality_filters['parent_company'] = developer
+    # Extract developers - for comparatives, include all mentioned
+    developers = extract_developers(query)
+    if developers:
+        equality_filters['parent_company'] = developers if (comparative and len(developers) > 1) else developers[0]
 
     # Extract numeric filters
     numeric_filters = extract_numeric_filters(query)
 
     return ExtractedFilters(
         equality_filters=equality_filters,
-        numeric_filters=numeric_filters
+        numeric_filters=numeric_filters,
+        is_comparative=comparative
     )
 
 
@@ -289,16 +339,7 @@ def validate_retrieved_docs(
     """
     Post-retrieval validation: Check if retrieved docs match extracted filters.
 
-    This is a belt-and-suspenders check after ChromaDB filtering.
-    Logs warnings for any docs that slipped through.
-
-    Args:
-        docs: Retrieved documents
-        filters: Extracted filters that should have been applied
-        logger: Optional logger for warnings
-
-    Returns:
-        Tuple of (valid_docs, warnings)
+    For multi-value filters, doc passes if it matches ANY value in the list.
     """
     if filters.is_empty():
         return docs, []
@@ -311,48 +352,61 @@ def validate_retrieved_docs(
         is_valid = True
 
         # Check equality filters
-        for field, expected in filters.equality_filters.items():
-            actual = meta.get(field)
-            if actual and actual != expected:
-                warnings.append(
-                    f"Doc {meta.get('project_name', 'unknown')}: "
-                    f"{field}={actual} (expected {expected})"
-                )
-                is_valid = False
-                break
-
-        # Check numeric filters
-        for nf in filters.numeric_filters:
-            actual = meta.get(nf.field)
-            if actual is not None:
-                try:
-                    actual_val = float(actual)
-                    passed = False
-                    if nf.operator == '$gt':
-                        passed = actual_val > nf.value
-                    elif nf.operator == '$gte':
-                        passed = actual_val >= nf.value
-                    elif nf.operator == '$lt':
-                        passed = actual_val < nf.value
-                    elif nf.operator == '$lte':
-                        passed = actual_val <= nf.value
-
-                    if not passed:
+        for fld, expected in filters.equality_filters.items():
+            actual = meta.get(fld)
+            if actual:
+                if isinstance(expected, list):
+                    # Multi-value: pass if actual matches ANY expected value
+                    if actual not in expected:
                         warnings.append(
                             f"Doc {meta.get('project_name', 'unknown')}: "
-                            f"{nf.field}={actual_val} (expected {nf.operator} {nf.value})"
+                            f"{fld}={actual} (expected one of {expected})"
                         )
                         is_valid = False
                         break
-                except (ValueError, TypeError):
-                    pass
+                else:
+                    # Single value
+                    if actual != expected:
+                        warnings.append(
+                            f"Doc {meta.get('project_name', 'unknown')}: "
+                            f"{fld}={actual} (expected {expected})"
+                        )
+                        is_valid = False
+                        break
+
+        # Check numeric filters
+        if is_valid:
+            for nf in filters.numeric_filters:
+                actual = meta.get(nf.field)
+                if actual is not None:
+                    try:
+                        actual_val = float(actual)
+                        passed = False
+                        if nf.operator == '$gt':
+                            passed = actual_val > nf.value
+                        elif nf.operator == '$gte':
+                            passed = actual_val >= nf.value
+                        elif nf.operator == '$lt':
+                            passed = actual_val < nf.value
+                        elif nf.operator == '$lte':
+                            passed = actual_val <= nf.value
+
+                        if not passed:
+                            warnings.append(
+                                f"Doc {meta.get('project_name', 'unknown')}: "
+                                f"{nf.field}={actual_val} (expected {nf.operator} {nf.value})"
+                            )
+                            is_valid = False
+                            break
+                    except (ValueError, TypeError):
+                        pass
 
         if is_valid:
             valid_docs.append(doc)
 
     # Log warnings
     if logger and warnings:
-        for w in warnings[:5]:  # Limit to first 5
+        for w in warnings[:5]:
             logger.warning(f"Post-validation filter leak: {w}")
         if len(warnings) > 5:
             logger.warning(f"... and {len(warnings) - 5} more filter leaks")
@@ -368,8 +422,14 @@ def format_filters_for_logging(filters: ExtractedFilters) -> str:
     """Format extracted filters for logging/debugging."""
     parts = []
 
-    for field, value in filters.equality_filters.items():
-        parts.append(f"{field}={value}")
+    if filters.is_comparative:
+        parts.append("[COMPARATIVE]")
+
+    for fld, value in filters.equality_filters.items():
+        if isinstance(value, list):
+            parts.append(f"{fld} IN {value}")
+        else:
+            parts.append(f"{fld}={value}")
 
     for nf in filters.numeric_filters:
         op_map = {
