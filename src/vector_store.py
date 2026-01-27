@@ -11,8 +11,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 
 load_dotenv()
 
-# Load from .env or use default relative path
-CHROMADB_PATH = os.getenv("CHROMADB_PATH", "./output/chromadb")
+# Load from .env or use default path to sibling ERCOT RAG system repo
+CHROMADB_PATH = os.getenv("CHROMADB_PATH", "../ercot-lgia-rag-system/output/chromadb")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "sgia_chunks")
 
