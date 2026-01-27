@@ -10,6 +10,7 @@ import streamlit as st
 
 from src.add_documents import add_files
 from src.rag_advanced.chain import get_rag_chain
+from src.rag_advanced.components import classify_query
 from src.rag_advanced.utils import RAGMode, set_verbose, detect_language
 from src.vector_store import get_document_content, get_retriever
 
@@ -434,7 +435,16 @@ if user_text:
     with st.chat_message("user"):
         st.markdown(user_text)
 
-    # 2) Generate response (streaming)
+    # 2) Classify query and display badge
+    query_type = classify_query(user_text)
+    if query_type == "aggregation":
+        st.caption("📊 Using corpus analytics")
+    elif query_type == "hybrid":
+        st.caption("📊 Using analytics + 📄 document retrieval")
+    else:
+        st.caption("📄 Using document retrieval")
+
+    # 3) Generate response (streaming)
     with st.chat_message("assistant"):
 
         # Verbose logging area

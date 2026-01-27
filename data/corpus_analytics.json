@@ -1,0 +1,271 @@
+{
+  "generated_at": "2025-01-27T00:00:00Z",
+  "chromadb_path": "./output/chromadb",
+  "note": "SAMPLE DATA - Regenerate with: python -m src.analytics.corpus_analytics --output data/corpus_analytics.json",
+  "corpus_stats": {
+    "total_projects": 133,
+    "total_chunks": 2450,
+    "projects_with_security_data": 82,
+    "security_per_kw": {
+      "n": 82,
+      "median": 48.50,
+      "mean": 56.23,
+      "min": 0.28,
+      "max": 132.10,
+      "std_dev": 28.40
+    }
+  },
+  "by_fuel_type": {
+    "Battery": {
+      "count": 35,
+      "projects_with_security_data": 28,
+      "median_security_per_kw": 47.00,
+      "mean_security_per_kw": 49.20,
+      "n": 28
+    },
+    "Solar": {
+      "count": 45,
+      "projects_with_security_data": 32,
+      "median_security_per_kw": 52.30,
+      "mean_security_per_kw": 55.10,
+      "n": 32
+    },
+    "Wind": {
+      "count": 38,
+      "projects_with_security_data": 18,
+      "median_security_per_kw": 61.20,
+      "mean_security_per_kw": 58.90,
+      "n": 18
+    },
+    "Gas": {
+      "count": 15,
+      "projects_with_security_data": 4,
+      "median_security_per_kw": 42.00,
+      "mean_security_per_kw": 45.30,
+      "n": 4
+    }
+  },
+  "by_zone": {
+    "WEST": {
+      "count": 45,
+      "projects_with_security_data": 35,
+      "median_security_per_kw": 44.20,
+      "mean_security_per_kw": 46.50,
+      "n": 35
+    },
+    "COAST": {
+      "count": 38,
+      "projects_with_security_data": 22,
+      "median_security_per_kw": 51.80,
+      "mean_security_per_kw": 54.20,
+      "n": 22
+    },
+    "SOUTH": {
+      "count": 25,
+      "projects_with_security_data": 15,
+      "median_security_per_kw": 48.90,
+      "mean_security_per_kw": 50.10,
+      "n": 15
+    },
+    "NORTH": {
+      "count": 20,
+      "projects_with_security_data": 8,
+      "median_security_per_kw": 55.60,
+      "mean_security_per_kw": 57.30,
+      "n": 8
+    },
+    "PANHANDLE": {
+      "count": 5,
+      "projects_with_security_data": 2,
+      "median_security_per_kw": 38.50,
+      "mean_security_per_kw": 40.20,
+      "n": 2
+    }
+  },
+  "tsp_rankings": [
+    {
+      "rank": 1,
+      "tsp": "TNMP",
+      "avg_security_per_kw": 68.40,
+      "median_security_per_kw": 65.20,
+      "project_count": 12,
+      "n": 8
+    },
+    {
+      "rank": 2,
+      "tsp": "LCRA",
+      "avg_security_per_kw": 58.90,
+      "median_security_per_kw": 56.40,
+      "project_count": 8,
+      "n": 5
+    },
+    {
+      "rank": 3,
+      "tsp": "AEP",
+      "avg_security_per_kw": 54.30,
+      "median_security_per_kw": 52.80,
+      "project_count": 18,
+      "n": 12
+    },
+    {
+      "rank": 4,
+      "tsp": "ONCOR",
+      "avg_security_per_kw": 52.30,
+      "median_security_per_kw": 50.10,
+      "project_count": 45,
+      "n": 32
+    },
+    {
+      "rank": 5,
+      "tsp": "CENTERPOINT",
+      "avg_security_per_kw": 48.60,
+      "median_security_per_kw": 46.90,
+      "project_count": 38,
+      "n": 20
+    },
+    {
+      "rank": 6,
+      "tsp": "AUSTIN ENERGY",
+      "avg_security_per_kw": 42.10,
+      "median_security_per_kw": 40.50,
+      "project_count": 6,
+      "n": 3
+    },
+    {
+      "rank": 7,
+      "tsp": "RAYBURN",
+      "avg_security_per_kw": 39.80,
+      "median_security_per_kw": 38.20,
+      "project_count": 4,
+      "n": 2
+    }
+  ],
+  "developer_analysis": {
+    "multi_zone_developers": {
+      "INTERSECT": ["WEST", "COAST"],
+      "NEXTERA": ["WEST", "NORTH", "COAST"],
+      "INVENERGY": ["WEST", "SOUTH"],
+      "ENEL": ["COAST", "SOUTH"],
+      "RWE": ["WEST", "PANHANDLE"],
+      "PATTERN": ["WEST", "NORTH"]
+    },
+    "diversified_portfolios": [
+      {
+        "developer": "NEXTERA",
+        "technologies": ["Battery", "Solar", "Wind"],
+        "project_count": 12,
+        "n": 12
+      },
+      {
+        "developer": "INTERSECT",
+        "technologies": ["Battery", "Solar"],
+        "project_count": 8,
+        "n": 8
+      },
+      {
+        "developer": "INVENERGY",
+        "technologies": ["Solar", "Wind"],
+        "project_count": 6,
+        "n": 6
+      },
+      {
+        "developer": "RWE",
+        "technologies": ["Solar", "Wind"],
+        "project_count": 5,
+        "n": 5
+      },
+      {
+        "developer": "ENEL",
+        "technologies": ["Battery", "Solar"],
+        "project_count": 4,
+        "n": 4
+      }
+    ]
+  },
+  "geographic_concentration": [
+    {"county": "Haskell", "project_count": 12, "zone": "WEST", "n": 12},
+    {"county": "Harris", "project_count": 10, "zone": "COAST", "n": 10},
+    {"county": "Pecos", "project_count": 9, "zone": "WEST", "n": 9},
+    {"county": "Webb", "project_count": 8, "zone": "SOUTH", "n": 8},
+    {"county": "Ector", "project_count": 7, "zone": "WEST", "n": 7},
+    {"county": "Brazoria", "project_count": 6, "zone": "COAST", "n": 6},
+    {"county": "Reeves", "project_count": 6, "zone": "WEST", "n": 6},
+    {"county": "Bexar", "project_count": 5, "zone": "SOUTH", "n": 5},
+    {"county": "Dallas", "project_count": 4, "zone": "NORTH", "n": 4},
+    {"county": "Tarrant", "project_count": 4, "zone": "NORTH", "n": 4}
+  ],
+  "specific_developers": {
+    "RWE": {
+      "project_count": 5,
+      "projects_with_security_data": 3,
+      "median_security_per_kw": 58.40,
+      "mean_security_per_kw": 56.80,
+      "vs_corpus_median": "+20.4%",
+      "assessment": "ABOVE_MARKET",
+      "n": 3
+    },
+    "NEXTERA": {
+      "project_count": 12,
+      "projects_with_security_data": 8,
+      "median_security_per_kw": 52.10,
+      "mean_security_per_kw": 54.30,
+      "vs_corpus_median": "+7.4%",
+      "assessment": "ABOVE_MARKET",
+      "n": 8
+    }
+  },
+  "data_quality": {
+    "low_sample_warnings": [
+      {
+        "category": "fuel_type",
+        "bucket": "Gas",
+        "sample_size": 4,
+        "warning": "Low sample size (n=4 < 10)"
+      },
+      {
+        "category": "zone",
+        "bucket": "PANHANDLE",
+        "sample_size": 2,
+        "warning": "Low sample size (n=2 < 10)"
+      },
+      {
+        "category": "zone",
+        "bucket": "NORTH",
+        "sample_size": 8,
+        "warning": "Low sample size (n=8 < 10)"
+      },
+      {
+        "category": "tsp",
+        "bucket": "TNMP",
+        "sample_size": 8,
+        "warning": "Low sample size (n=8 < 10)"
+      },
+      {
+        "category": "tsp",
+        "bucket": "LCRA",
+        "sample_size": 5,
+        "warning": "Low sample size (n=5 < 10)"
+      },
+      {
+        "category": "specific_developer",
+        "bucket": "RWE",
+        "sample_size": 3,
+        "warning": "Low sample size (n=3 < 10)"
+      },
+      {
+        "category": "specific_developer",
+        "bucket": "NEXTERA",
+        "sample_size": 8,
+        "warning": "Low sample size (n=8 < 10)"
+      }
+    ],
+    "missing_data_warnings": [
+      {
+        "field": "security_per_kw",
+        "missing_count": 51,
+        "missing_pct": 38.3,
+        "warning": "38.3% of projects missing security_per_kw data"
+      }
+    ]
+  }
+}
