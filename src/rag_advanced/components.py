@@ -1,11 +1,13 @@
 # Core logic components for RAG pipeline
 
 from typing import Dict, Generator, Any, List, Callable, Tuple
+from collections import defaultdict
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain.schema import Document
 
 from src.llm_client import call_llm_api, call_llm_api_full
 from .utils import (
@@ -18,6 +20,113 @@ from .prompts import (
     QUERY_EXPANSION_PROMPT, METADATA_EXTRACTION_PROMPT,
     SYSTEM_EN, SYSTEM_ES
 )
+
+
+# =============================================================================
+# DOCUMENT DEDUPLICATION
+# Prevents LLM from listing the same project multiple times
+# =============================================================================
+
+def deduplicate_docs_by_inr(
+    docs: List[Document],
+    max_chunks_per_project: int = 2
+) -> List[Document]:
+    """
+    Limit chunks per project to prevent repetition in LLM output.
+
+    Problem: When 15 chunks come from 3 projects (5 each), the LLM
+    tends to list each project 5 times in the response.
+
+    Solution: Keep only the most informative chunks per project INR.
+
+    Args:
+        docs: List of retrieved documents
+        max_chunks_per_project: Maximum chunks to keep per unique INR
+
+    Returns:
+        Deduplicated list of documents
+    """
+    if not docs:
+        return []
+
+    # Group by INR
+    inr_groups: Dict[str, List[Document]] = defaultdict(list)
+    for doc in docs:
+        inr = doc.metadata.get('inr', 'unknown')
+        inr_groups[inr].append(doc)
+
+    def score_chunk(doc: Document) -> int:
+        """Score a chunk by informativeness (higher = better)."""
+        score = 0
+        meta = doc.metadata
+
+        # Prefer chunks with key financial data
+        if meta.get('security_amount'):
+            score += 10
+        if meta.get('security_per_kw'):
+            score += 10
+        if meta.get('nameplate_capacity_mw') or meta.get('capacity_mw'):
+            score += 5
+
+        # Prefer certain section types
+        section = str(meta.get('section_type', '') or meta.get('section', '')).lower()
+        if 'schedule' in section:
+            score += 5
+        if 'exhibit' in section:
+            score += 4
+        if 'article' in section:
+            score += 3
+        if 'annex' in section:
+            score += 3
+
+        # Prefer longer content (more context)
+        content = doc.page_content or ''
+        if len(content) > 1000:
+            score += 3
+        elif len(content) > 500:
+            score += 2
+
+        return score
+
+    # Select top chunks per project
+    result = []
+    for inr, chunks in inr_groups.items():
+        sorted_chunks = sorted(chunks, key=score_chunk, reverse=True)
+        result.extend(sorted_chunks[:max_chunks_per_project])
+
+    return result
+
+
+def get_unique_projects_from_docs(docs: List[Document]) -> Dict[str, Dict[str, Any]]:
+    """
+    Extract unique projects from documents for listing purposes.
+
+    Args:
+        docs: List of documents
+
+    Returns:
+        Dict mapping INR to project info
+        Example: {'25INR0138': {'name': 'Champaign BESS', 'developer': 'SAMSUNG', ...}}
+    """
+    projects = {}
+
+    for doc in docs:
+        meta = doc.metadata
+        inr = meta.get('inr', '')
+        if not inr or inr in projects:
+            continue
+
+        projects[inr] = {
+            'name': meta.get('project_name', ''),
+            'inr': inr,
+            'developer': meta.get('parent_company', '') or meta.get('developer_spv', ''),
+            'fuel_type': meta.get('fuel_type', ''),
+            'capacity_mw': meta.get('capacity_mw', 0),
+            'zone': meta.get('zone', ''),
+            'tsp': meta.get('tsp_normalized', ''),
+        }
+
+    return projects
 
 # --- Domain Filter ---
 
@@ -542,13 +651,28 @@ def extract_query_metadata(question: str) -> Dict[str, Any]:
 def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None) -> Generator[str, None, None]:
     """Thinking mode: Structured response with validation.
 
-    Flow: Classify → Extract Metadata → Expand queries → Retrieve → Generate → Validate
+    Enhanced with:
+    - Hard filtering for comparative queries with alias expansion
+    - Deduplication by INR to prevent listing same projects multiple times
+    - Missing entity warnings
+
+    Flow: Classify → Extract Metadata → Expand queries → Retrieve → Dedupe → Generate → Validate
     Note: Domain guardrail is checked in thinking_generator before this is called.
     """
+    # Import here to avoid circular imports
+    from src.vector_store import build_chromadb_where_clause
+    from .attribution_validator import (
+        check_missing_entities,
+        generate_attribution_warning,
+        get_developers_in_docs
+    )
+
     logger = get_logger()
     question = input_dict["question"]
     history = input_dict.get("chat_history", [])
     with_summary = input_dict.get("with_summary", False)
+    extracted_filters = input_dict.get("extracted_filters", {})
+    is_comparative = input_dict.get("is_comparative", False)
 
     # Use k_total if provided, else fallback to reasonable default or unlimited
     max_docs = k_total if k_total else 15
@@ -560,26 +684,41 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     logger.info("THINKING MODE ACTIVATED")
     logger.info("=" * 50)
     logger.info(f"Language: {lang}")
+    if is_comparative:
+        logger.info(f"Comparative query detected with filters: {extracted_filters}")
 
     # 2. Classify Question Type
     question_type = classify_question(question)
     format_instructions = get_format_instructions(question_type, lang)
 
-    # 3. Metadata Extraction
+    # 3. Metadata Extraction (LLM-based, complements regex-based filters)
     metadata_filters = extract_query_metadata(question)
 
     # 4. Query Expansion
     queries = expand_query(question)
 
-    # 5. Multi-Query Retrieval (with metadata boosting)
+    # 5. Build hard filter for comparative queries
+    where_clause = None
+    if is_comparative and extracted_filters:
+        where_clause = build_chromadb_where_clause(extracted_filters, expand_aliases=True)
+        if where_clause:
+            logger.info(f"Built ChromaDB where clause: {where_clause}")
+
+    # 6. Multi-Query Retrieval
     # Strategy: Split K total budget across N queries
-    # This prevents expanding context too much with duplicate/irrelevant info from many queries
     num_queries = len(queries)
     k_per_query = max(1, max_docs // num_queries) if max_docs else None
 
     logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
 
-    all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
+    # Use hard filtering for comparative queries if retriever supports it
+    if where_clause and hasattr(retriever, 'search_with_hard_filters'):
+        logger.info("Using HARD filtering mode for comparative query")
+        # For hard filtering, we retrieve with the filter applied
+        all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
+    else:
+        # Standard multi-retrieve with boosting
+        all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
 
     if not all_docs:
         msg = ("No tengo información sobre eso en los documentos disponibles."
@@ -588,12 +727,34 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         yield msg
         return
 
+    # === DEDUPLICATION ===
+    original_count = len(all_docs)
+    all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=2)
+    if len(all_docs) < original_count:
+        logger.info(f"Deduplicated: {original_count} -> {len(all_docs)} documents")
+
     # Final safety clamp to k_total (in case disjoint sets exceeded total)
     if max_docs and len(all_docs) > max_docs:
         logger.info(f"Clamping final merged documents from {len(all_docs)} to {max_docs}")
         all_docs = all_docs[:max_docs]
 
-    # 6. Format sources for response
+    # === CHECK FOR MISSING ENTITIES ===
+    missing_warning = None
+    if is_comparative:
+        requested_entities = []
+        if isinstance(extracted_filters.get('parent_company'), list):
+            requested_entities = extracted_filters['parent_company']
+        elif isinstance(extracted_filters.get('tsp_normalized'), list):
+            requested_entities = extracted_filters['tsp_normalized']
+
+        if requested_entities:
+            found_entities = get_developers_in_docs(all_docs)
+            missing = check_missing_entities(requested_entities, all_docs)
+            if missing:
+                missing_warning = generate_attribution_warning(missing, found_entities, lang)
+                logger.warning(f"Missing entities in results: {missing}")
+
+    # 7. Format sources for response
     retrieval = format_sources(all_docs)
     context = retrieval["context"]
 
@@ -659,6 +820,11 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 """
 
     # Stream output
+    # Add missing entity warning first if applicable
+    if missing_warning:
+        yield missing_warning
+        yield "\n\n"
+
     yield thought_summary
     yield final_response
 
