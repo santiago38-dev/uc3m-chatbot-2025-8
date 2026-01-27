@@ -19,8 +19,9 @@ from .components import (
     generate_flash_response, generate_thinking_response
 )
 from .query_filter_extractor import (
-    extract_query_filters, format_filters_for_logging
+    extract_query_filters, format_filters_for_logging, validate_retrieved_docs
 )
+from .hallucination_guard import validate_entities_exist
 
 # Out-of-scope question messages
 OOS_QUESTION_MSG = {
@@ -52,7 +53,7 @@ def get_flash_chain(
     get_logger().info("Building FLASH mode chain")
 
     def flash_with_domain_filter(input_dict: Dict) -> Generator[str, None, None]:
-        """Flash generator with domain pre-filter and hard filtering support."""
+        """Flash generator with domain pre-filter, hard filtering, and hallucination guard."""
         logger = get_logger()
         question = input_dict["question"]
         history = input_dict.get("chat_history", [])
@@ -72,14 +73,35 @@ def get_flash_chain(
         if not extracted_filters.is_empty():
             logger.info(f"Flash filters: {format_filters_for_logging(extracted_filters)}")
 
+        # HALLUCINATION GUARD: Check if queried entities exist in corpus
+        if extracted_filters.equality_filters:
+            entity_check = validate_entities_exist(extracted_filters.equality_filters)
+            if entity_check.get("should_abort", False):
+                missing = entity_check.get("missing_entities", [])
+                abort_msg = (
+                    f"I don't have information about {', '.join(missing)} in my database of "
+                    f"ERCOT interconnection agreements. Please check the spelling or try a different query."
+                )
+                yield abort_msg
+                return
+
         # Retrieve documents with hard filtering if filters exist
         if where_clause and hasattr(retriever, 'search_with_hard_filters'):
             docs = retriever.search_with_hard_filters(question, where_clause)
             logger.info(f"Hard-filtered retrieval: {len(docs)} docs")
 
-            # If hard filtering returns too few docs, fall back to boosted search
-            if len(docs) < 3:
-                logger.info("Too few hard-filtered results, falling back to boosted search")
+            # If hard filtering returns 0 docs, try relaxing numeric filters only
+            if len(docs) == 0 and extracted_filters.numeric_filters:
+                logger.info("No results with numeric filter, trying equality filters only")
+                equality_only = {k: {"$eq": v} for k, v in extracted_filters.equality_filters.items()}
+                if equality_only:
+                    where_relaxed = {"$and": list(equality_only.values())} if len(equality_only) > 1 else list(equality_only.values())[0]
+                    docs = retriever.search_with_hard_filters(question, where_relaxed)
+                    logger.info(f"Relaxed filter retrieval: {len(docs)} docs")
+
+            # If still no docs, fall back to boosted search but log warning
+            if len(docs) == 0:
+                logger.warning("Hard filtering returned 0 docs, falling back to boosted search")
                 docs = retriever.search_with_filters(
                     question,
                     filters=extracted_filters.equality_filters
@@ -87,6 +109,13 @@ def get_flash_chain(
         else:
             # No filters or retriever doesn't support hard filtering
             docs = retriever.invoke(question)
+
+        # POST-RETRIEVAL VALIDATION: Check for filter leaks
+        if not extracted_filters.is_empty():
+            valid_docs, warnings = validate_retrieved_docs(docs, extracted_filters, logger)
+            if warnings:
+                logger.warning(f"Post-validation removed {len(docs) - len(valid_docs)} docs that violated filters")
+                docs = valid_docs
 
         # Use k_total if explicitly passed, otherwise let retriever limit dictate
         retrieval = format_sources(docs, max_sources=k_total)
