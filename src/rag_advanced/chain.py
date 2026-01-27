@@ -15,7 +15,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 
 from src.chat_history import get_session_history
 from src.llm_client import call_llm_api_full
-from src.vector_store import (
+from .filter_utils import (
     extract_multi_filters_from_query,
     build_chromadb_where_clause
 )

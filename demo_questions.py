@@ -29,7 +29,7 @@ def test_filter_extraction():
     print("TESTING FILTER EXTRACTION")
     print("=" * 70)
 
-    from src.vector_store import extract_multi_filters_from_query, build_chromadb_where_clause
+    from src.rag_advanced.filter_utils import extract_multi_filters_from_query, build_chromadb_where_clause
 
     for qid, question in TEST_QUESTIONS.items():
         print(f"\n{qid}: {question}")
@@ -54,8 +54,8 @@ def test_retrieval(question: str, k: int = 15, verbose: bool = False):
     print(f"TESTING RETRIEVAL: {question}")
     print("=" * 70)
 
-    from src.vector_store import (
-        get_smart_retriever,
+    from src.vector_store import get_smart_retriever
+    from src.rag_advanced.filter_utils import (
         extract_multi_filters_from_query,
         build_chromadb_where_clause
     )
