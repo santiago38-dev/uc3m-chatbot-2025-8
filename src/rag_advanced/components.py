@@ -7,7 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from src.llm_client import call_llm_api, call_llm_api_full
 from .utils import (

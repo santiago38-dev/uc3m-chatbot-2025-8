@@ -16,7 +16,7 @@ Solution:
 
 import re
 from typing import List, Dict, Tuple, Set, Optional
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from .alias_expander import get_canonical_parent, CHROMADB_PARENT_ALIASES
 
