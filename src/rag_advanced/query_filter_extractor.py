@@ -47,12 +47,20 @@ class ExtractedFilters:
         """Convert to ChromaDB where clause format.
 
         Uses $in operator for multi-value filters (comparative queries).
+        Expands parent_company to all possible stored forms for exact matching.
         """
         conditions = []
 
         # Add equality filters
         for fld, value in self.equality_filters.items():
-            if isinstance(value, list):
+            # Special handling for parent_company - expand to all stored forms
+            if fld == 'parent_company':
+                if isinstance(value, list):
+                    expanded = expand_developers_for_chromadb(value)
+                else:
+                    expanded = expand_developer_for_chromadb(value)
+                conditions.append({fld: {"$in": expanded}})
+            elif isinstance(value, list):
                 # Multi-value: use $in operator
                 conditions.append({fld: {"$in": value}})
             else:
@@ -202,6 +210,65 @@ def extract_tsp(query: str) -> Optional[str]:
 # =============================================================================
 # DEVELOPER DETECTION - Uses PARENT_MAPPING as source of truth
 # =============================================================================
+
+# Legal entity suffixes commonly found in ERCOT documents
+LEGAL_SUFFIXES = ['', ', LLC', ', INC.', ', INC', ' LLC', ' INC', ', L.P.', ' LP']
+
+
+def expand_developer_for_chromadb(canonical_name: str) -> List[str]:
+    """
+    Expand a canonical developer name to all possible stored forms in ChromaDB.
+
+    ChromaDB requires EXACT string match with $in operator.
+    ERCOT documents store full legal entity names like "RWE SOLAR DEVELOPMENT, LLC"
+
+    Args:
+        canonical_name: Canonical name like "RWE", "SAMSUNG"
+
+    Returns:
+        List of all possible stored forms to match against
+    """
+    expansions = set()
+
+    # Add the canonical name itself
+    expansions.add(canonical_name)
+    expansions.add(canonical_name.upper())
+
+    # Get aliases from PARENT_MAPPING
+    aliases = PARENT_MAPPING.get(canonical_name, [])
+
+    for alias in aliases:
+        # Add base alias (uppercase for ChromaDB matching)
+        alias_upper = alias.upper()
+        expansions.add(alias_upper)
+
+        # Add with common legal suffixes
+        for suffix in LEGAL_SUFFIXES:
+            expansions.add(f"{alias_upper}{suffix}")
+
+        # Special handling for multi-word aliases - add " AMERICA" variants
+        if ' ' in alias_upper:
+            expansions.add(f"{alias_upper} AMERICA")
+            expansions.add(f"{alias_upper} AMERICA, INC.")
+            expansions.add(f"{alias_upper} AMERICAS")
+
+    return sorted(expansions)
+
+
+def expand_developers_for_chromadb(canonical_names: List[str]) -> List[str]:
+    """Expand multiple canonical names for ChromaDB $in clause."""
+    all_expansions = []
+    for name in canonical_names:
+        all_expansions.extend(expand_developer_for_chromadb(name))
+    # Remove duplicates while preserving order
+    seen = set()
+    unique = []
+    for exp in all_expansions:
+        if exp not in seen:
+            seen.add(exp)
+            unique.append(exp)
+    return unique
+
 
 def extract_developers(query: str) -> List[str]:
     """Extract ALL matching developers from query (for comparative queries)."""
@@ -355,7 +422,20 @@ def validate_retrieved_docs(
         for fld, expected in filters.equality_filters.items():
             actual = meta.get(fld)
             if actual:
-                if isinstance(expected, list):
+                # For parent_company, expand expected values to match stored forms
+                if fld == 'parent_company':
+                    if isinstance(expected, list):
+                        expanded = expand_developers_for_chromadb(expected)
+                    else:
+                        expanded = expand_developer_for_chromadb(expected)
+                    if actual not in expanded:
+                        warnings.append(
+                            f"Doc {meta.get('project_name', 'unknown')}: "
+                            f"{fld}={actual} (expected one of canonical: {expected})"
+                        )
+                        is_valid = False
+                        break
+                elif isinstance(expected, list):
                     # Multi-value: pass if actual matches ANY expected value
                     if actual not in expected:
                         warnings.append(
