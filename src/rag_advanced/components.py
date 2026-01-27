@@ -1,6 +1,6 @@
 # Core logic components for RAG pipeline
 
-from typing import Dict, Generator, Any, List, Callable, Tuple
+from typing import Dict, Generator, Any, List, Callable, Tuple, Literal
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,6 +18,92 @@ from .prompts import (
     QUERY_EXPANSION_PROMPT, METADATA_EXTRACTION_PROMPT,
     SYSTEM_EN, SYSTEM_ES
 )
+
+
+# --- QUERY CLASSIFICATION FOR ANALYTICS ROUTING ---
+
+# Patterns that indicate aggregation queries (require corpus-wide statistics)
+AGGREGATION_SIGNALS = [
+    # Statistical keywords
+    r'\b(median|average|mean|total|sum|count|range|distribution)\b',
+    r'\b(rank|ranking|top|bottom|highest|lowest|most|least)\b',
+    r'\b(compare|comparison|versus|vs)\b.*\b(corpus|market|industry|overall)\b',
+
+    # Aggregation question patterns
+    r'\bhow many\b',
+    r'\bwhat percentage\b',
+    r'\bwhat proportion\b',
+    r'\bacross all\b',
+    r'\bin the corpus\b',
+    r'\boverall\b',
+    r'\bmarket (average|median|rate)\b',
+
+    # Specific aggregation questions
+    r'\bwhich (developers?|companies|tsps?|counties|zones?) have\b',
+    r'\bgeographic (concentration|distribution|patterns?)\b',
+    r'\bdiversified (portfolio|mix)\b',
+    r'\bmulti[- ]?zone\b',
+    r'\b(typical|standard|normal) (security|cost|rate)\b',
+
+    # ERCOT-specific aggregation
+    r'\b(security cost|security deposit|security amount).*(per kw|per mw|\$/kw|\$/mw)\b',
+    r'\btsp.*(ranking|comparison|average|median)\b',
+    r'\bzone.*(comparison|average|median|breakdown)\b',
+]
+
+# Patterns for specific entity mentions (suggests retrieval component needed)
+ENTITY_PATTERNS = [
+    r'\b\d{2}INR\d{4,5}\b',  # INR number format: YYINR####
+    r'\bproject\s+[A-Z][a-zA-Z0-9\s]+\b',  # "Project Quantum", "Project Solar Farm"
+    r'\bsgia\b',  # Specific agreement reference
+    r'\b(samsung|intersect|rwe|nextera|invenergy|enel|pattern|terra-?gen|longroad|savion)\b',  # Known developers
+    r'\b(oncor|centerpoint|aep|tnmp|lcra|austin energy)\b',  # Known TSPs (specific mention)
+]
+
+
+def classify_query(query: str) -> Literal["aggregation", "retrieval", "hybrid"]:
+    """
+    Classify query type to route to appropriate data source.
+
+    Returns:
+        "aggregation" - Use pre-computed analytics JSON (corpus-wide statistics)
+        "retrieval" - Use ChromaDB semantic search (specific documents)
+        "hybrid" - Use both (e.g., "Compare RWE to market" needs RWE chunks + market stats)
+
+    Examples:
+        "What's the median security cost per kW?" -> "aggregation"
+        "What are the force majeure terms?" -> "retrieval"
+        "Compare RWE to corpus median" -> "hybrid"
+        "Which developers have projects in multiple zones?" -> "aggregation"
+    """
+    query_lower = query.lower()
+
+    # Count aggregation signals
+    aggregation_score = sum(
+        1 for pattern in AGGREGATION_SIGNALS
+        if re.search(pattern, query_lower)
+    )
+
+    # Check for specific entity mentions
+    has_specific_entity = any(
+        re.search(pattern, query, re.IGNORECASE)
+        for pattern in ENTITY_PATTERNS
+    )
+
+    # Decision logic
+    if aggregation_score >= 2 and not has_specific_entity:
+        return "aggregation"
+    elif aggregation_score >= 1 and has_specific_entity:
+        return "hybrid"
+    elif aggregation_score >= 1:
+        # Single aggregation signal without entity - still likely aggregation
+        return "aggregation"
+    else:
+        return "retrieval"
+
+
+# Type alias for query classification result
+QueryType = Literal["aggregation", "retrieval", "hybrid"]
 
 # --- Domain Filter ---
 
