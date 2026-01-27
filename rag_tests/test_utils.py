@@ -52,7 +52,7 @@ class RAGQualityEvaluator:
         self.rag_chain = get_rag_chain(
             retriever=self.retriever,
             mode=mode,
-            k_total=k_docs,
+            k_docs=k_docs,
             with_history=True,
             with_summary=with_summary
         )
