@@ -87,7 +87,7 @@ def show_document(project, inr, section):
     st.markdown(html, unsafe_allow_html=True)
 
 
-st.set_page_config(page_title="UC3M RAG Chatbot", page_icon="💬", layout="centered")
+st.set_page_config(page_title="ERCOT RAG Chatbot", page_icon="💬", layout="centered")
 
 
 def file_hash(path: str) -> str:
@@ -109,12 +109,12 @@ def load_chain(k_docs: int, mode: str, with_summary: bool):
     retriever = get_retriever(k_docs=k_docs)
     # Map string mode to Enum
     rag_mode = RAGMode(mode)
-    chain = get_rag_chain(retriever, mode=rag_mode, k_total=k_docs, with_summary=with_summary)
+    chain = get_rag_chain(retriever, mode=rag_mode, k_docs=k_docs, with_summary=with_summary)
     return chain, retriever
 
 
-st.title("⚡ ERCOT Projects Chatbot")
-st.caption("Electric Reliability Council of Texas")
+st.title("⚡ SGIA Intelligence")
+st.caption("133 Texas Interconnection Agreements")
 
 
 def keep_only_last_sources(text: str) -> str:
@@ -143,13 +143,16 @@ def keep_only_last_sources(text: str) -> str:
 # Sidebar: Settings + Upload
 # -------------------------
 with st.sidebar:
-    logo_path = Path(__file__).parent / "ERCOT-logo-1-1779176074.webp"
+    logo_path = Path(__file__).parent / "ercot_image.png"
     if logo_path.exists():
         st.image(str(logo_path), use_column_width=True)
     else:
         st.warning("Logo not found")
 
     st.header("OPTIONS")
+
+    # BERTopic toggle (disabled by default)
+    enable_bertopic = st.checkbox("Enable BERTopic suggestions", value=False)
 
     # Mode selection
     def reset_conversation():
@@ -500,7 +503,7 @@ if user_text:
             if is_out_of_scope:
                 st.caption("🔍 Out-of-scope question detected - skipping topic suggestions")
 
-            if not is_out_of_scope:
+            if not is_out_of_scope and enable_bertopic:
                 try:
                     # Detect language for multilingual topic suggestions
                     query_lang = detect_language(user_text)
