@@ -31,13 +31,20 @@ class RAGConfig:
     """Centralized configuration for RAG pipeline parameters."""
 
     # --- Document Retrieval ---
-    K_DOCS_DEFAULT = 15          # Default docs to retrieve from vector store
+    # CRITICAL: K_DOCS must be >= 5x max_chunks_per_project for comparative query diversity
+    # With max_chunks_per_project=5, we need K >= 25 for 5 project slots
+    # Formula: K_DOCS >= (desired_project_slots * max_chunks_per_project)
+    K_DOCS_DEFAULT = 25          # Default docs to retrieve from vector store
 
     # --- Flash Mode ---
     FLASH_MAX_SOURCES = 10        # Max documents to include in Flash response
 
     # --- Thinking Mode ---
     THINKING_MAX_QUERIES = 6            # Max query variants for expansion (1 original + generated)
+
+    # --- Comparative Query Boost ---
+    # When a comparative query is detected, multiply K by this factor
+    COMPARATIVE_K_MULTIPLIER = 1.5  # e.g., 25 * 1.5 = 37 docs for comparisons
 
     # --- Parallelization ---
     RETRIEVAL_WORKERS = 4        # Parallel workers for multi-query retrieval

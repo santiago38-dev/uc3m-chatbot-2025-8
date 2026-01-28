@@ -309,7 +309,7 @@ def get_context_for_query(
 # =============================================================================
 
 def create_comparative_filter_hook(
-    k_total: int = 15,
+    k_total: int = None,  # Use config.K_DOCS_DEFAULT if None
     max_chunks_per_project: int = 5
 ) -> Callable:
     """
@@ -318,10 +318,13 @@ def create_comparative_filter_hook(
     - Hard ChromaDB filtering with alias expansion
     - Deduplication by INR
     - Missing entity warnings
+    - DYNAMIC K BOOSTING: Increases k_total for comparative queries
 
     Returns:
         Callable with signature (query, retriever) -> (docs, retrieval_dict, warning_or_none)
     """
+    # Use centralized config default
+    effective_k = k_total if k_total is not None else config.K_DOCS_DEFAULT
 
     def comparative_filter_hook(query: str, retriever) -> Tuple[List, Dict, Optional[str]]:
         logger = get_logger()
@@ -337,6 +340,13 @@ def create_comparative_filter_hook(
             isinstance(filters.get('fuel_type'), list)
         )
 
+        # DYNAMIC K BOOSTING: Increase k for comparative queries to ensure diversity
+        # This prevents the "Top-K Squeeze" where one project consumes all slots
+        k_for_retrieval = effective_k
+        if is_comparative:
+            k_for_retrieval = int(effective_k * config.COMPARATIVE_K_MULTIPLIER)
+            logger.info(f"Comparative query detected: boosting k from {effective_k} to {k_for_retrieval}")
+
         # Log filter info
         if filters:
             logger.info(f"Extracted filters: {filters}")
@@ -350,7 +360,7 @@ def create_comparative_filter_hook(
             docs = retriever.search_with_hard_filters(
                 query,
                 where=where_clause,
-                k=k_total
+                k=k_for_retrieval  # Use boosted K
             )
         else:
             docs = retriever.invoke(query)
@@ -485,7 +495,7 @@ def execute_retrieval(
 
 def get_flash_chain(
     retriever,
-    k_total: int = 15,
+    k_total: int = None,  # Uses config.K_DOCS_DEFAULT if None
     with_history: bool = True,
     with_summary: bool = False,
     analytics_path: str = DEFAULT_ANALYTICS_PATH,
@@ -495,7 +505,7 @@ def get_flash_chain(
 
     Args:
         retriever: Document retriever
-        k_total: Max total documents to retrieve
+        k_total: Max total documents to retrieve (default: config.K_DOCS_DEFAULT)
         with_history: Whether to include chat history management
         with_summary: Whether to append document summary
         analytics_path: Path to pre-computed analytics JSON
@@ -505,7 +515,11 @@ def get_flash_chain(
     Returns:
         RAG chain runnable (with or without history wrapper)
     """
-    get_logger().info("Building FLASH mode chain (analytics-aware with hard filtering)")
+    # Use centralized config default if k_total not specified
+    if k_total is None:
+        k_total = config.K_DOCS_DEFAULT
+
+    get_logger().info(f"Building FLASH mode chain (k_total={k_total})")
 
     def flash_with_domain_filter(input_dict: Dict) -> Generator[str, None, None]:
         """Flash generator with domain pre-filter and analytics routing.
@@ -585,7 +599,7 @@ def get_flash_chain(
 
 def get_thinking_chain(
     retriever,
-    k_total: int = 15,
+    k_total: int = None,  # Uses config.K_DOCS_DEFAULT if None
     with_history: bool = True,
     with_summary: bool = False,
     analytics_path: str = DEFAULT_ANALYTICS_PATH,
@@ -595,13 +609,17 @@ def get_thinking_chain(
 
     Args:
         retriever: Document retriever
-        k_total: Max total documents to retrieve across all queries
+        k_total: Max total documents to retrieve across all queries (default: config.K_DOCS_DEFAULT)
         with_history: Whether to include chat history management
         with_summary: Whether to append document summary
         analytics_path: Path to pre-computed analytics JSON
         filter_hook: Optional callable for custom retrieval logic
     """
-    get_logger().info("Building THINKING mode chain (analytics-aware with hard filtering)")
+    # Use centralized config default if k_total not specified
+    if k_total is None:
+        k_total = config.K_DOCS_DEFAULT
+
+    get_logger().info(f"Building THINKING mode chain (k_total={k_total})")
 
     def thinking_generator(input_iter):
         """Generator function for RunnableGenerator - yields chunks from thinking response.

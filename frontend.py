@@ -16,7 +16,9 @@ from src.rag_advanced.utils import RAGMode, set_verbose, detect_language
 from src.vector_store import get_document_content, get_retriever
 from src.chat_history import clear_session_history
 
-K_DOCS = 10
+# CRITICAL: K_DOCS must be >= 5x max_chunks_per_project (5) for comparative query diversity
+# With max_chunks=5, K=25 supports 5 distinct projects in results
+K_DOCS = 25
 
 # --- DIALOGS ---
 @st.dialog("📄 Document Content", width="large")

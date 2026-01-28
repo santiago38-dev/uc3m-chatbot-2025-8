@@ -48,7 +48,7 @@ def get_vectorstore(chromadb_path: str = None) -> Chroma:
     return vectorstore
 
 
-def get_retriever(k_docs: int = 10, filters: dict = None, chromadb_path: str = None):
+def get_retriever(k_docs: int = 25, filters: dict = None, chromadb_path: str = None):
     """Get a standard LangChain retriever."""
     vectorstore = get_vectorstore(chromadb_path)
     search_kwargs = {"k": k_docs}
@@ -317,10 +317,10 @@ class SmartRetriever:
 
 
 def get_smart_retriever(
-    k_docs: int = 15,
+    k_docs: int = 25,
     chromadb_path: str = None,
     boost_factor: float = 0.8,
-    k_initial: int = 50
+    k_initial: int = 75  # Increased to support higher k_docs
 ) -> SmartRetriever:
     """
     Creates a SmartRetriever that uses boosted similarity search.
