@@ -583,7 +583,9 @@ def expand_query(question: str) -> List[str]:
     result = call_llm_api_full(prompt)
 
     queries = [q.strip() for q in result.strip().split('\n') if q.strip()]
-    queries = [question] + queries[:3]  # Original + up to 3 variants
+    # Use config value: THINKING_MAX_QUERIES includes original, so we take (N-1) variants
+    max_variants = config.THINKING_MAX_QUERIES - 1  # Reserve 1 slot for original
+    queries = [question] + queries[:max_variants]
 
     logger.success(f"Generated {len(queries)} query variants")
     for i, q in enumerate(queries):
