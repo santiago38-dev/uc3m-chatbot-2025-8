@@ -118,7 +118,7 @@ AnalyticsQueryType = Literal["aggregation", "retrieval", "hybrid"]
 
 def deduplicate_docs_by_inr(
     docs: List[Document],
-    max_chunks_per_project: int = 2
+    max_chunks_per_project: int = 5
 ) -> List[Document]:
     """
     Limit chunks per project to prevent repetition in LLM output.
@@ -157,14 +157,14 @@ def deduplicate_docs_by_inr(
         if meta.get('nameplate_capacity_mw') or meta.get('capacity_mw'):
             score += 5
 
-        # Prefer certain section types
+        # Prefer certain section types (Legal Evidence Bias)
         section = str(meta.get('section_type', '') or meta.get('section', '')).lower()
-        if 'schedule' in section:
-            score += 5
         if 'exhibit' in section:
-            score += 4
+            score += 10  # Exhibits contain the actual data (security amounts, costs)
+        if 'schedule' in section:
+            score += 8   # Schedules contain structured data tables
         if 'article' in section:
-            score += 3
+            score += 3   # Articles are usually boilerplate
         if 'annex' in section:
             score += 3
 
@@ -820,7 +820,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     # === DEDUPLICATION ===
     original_count = len(all_docs)
-    all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=2)
+    all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=5)
     if len(all_docs) < original_count:
         logger.info(f"Deduplicated: {original_count} -> {len(all_docs)} documents")
 
