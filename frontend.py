@@ -87,7 +87,7 @@ def show_document(project, inr, section):
     st.markdown(html, unsafe_allow_html=True)
 
 
-st.set_page_config(page_title="ERCOT RAG Chatbot", page_icon="💬", layout="centered")
+st.set_page_config(page_title="SGIA Intelligence", page_icon="⚡", layout="centered")
 
 
 def file_hash(path: str) -> str:
@@ -143,38 +143,13 @@ def keep_only_last_sources(text: str) -> str:
 # Sidebar: Settings + Upload
 # -------------------------
 with st.sidebar:
-    logo_path = Path(__file__).parent / "ercot_image.png"
-    if logo_path.exists():
-        st.image(str(logo_path), use_column_width=True)
-    else:
-        st.warning("Logo not found")
+    st.header("⚡ SGIA Intelligence")
 
-    st.header("OPTIONS")
-
-    # BERTopic toggle (disabled by default)
-    enable_bertopic = st.checkbox("Enable BERTopic suggestions", value=False)
-
-    # Mode selection
-    def reset_conversation():
-        st.session_state.messages = []
-        st.session_state.session_id = str(uuid.uuid4())
-        # We don't need manual rerun, Streamlit reruns after callback
-
-    mode_options = [m.value for m in RAGMode]
-    # Use key to persist state and callback to handle changes
-    selected_mode = st.radio(
-        "Select Mode",
-        mode_options,
-        index=0,
-        format_func=lambda x: x.capitalize(),
-        key="rag_mode_selection",
-        on_change=reset_conversation
-    )
-
-    # Removed manual last_mode check to prevent accidental resets
-
-    with_summary = st.toggle("Auto-summarization", value=False)
-    show_verbose = st.checkbox("Show internal processing", value=True)
+    # Demo mode: hardcode defaults, minimal options
+    selected_mode = "flash"  # hardcode for demo
+    enable_bertopic = False  # disabled for demo
+    with_summary = False
+    show_verbose = False  # hide internal processing for demo
 
     k_docs = st.slider("Number of retrieved documents", 1, 50, K_DOCS)
 
