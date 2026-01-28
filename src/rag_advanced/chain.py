@@ -343,8 +343,9 @@ def create_comparative_filter_hook(
             if where_clause:
                 logger.info(f"ChromaDB where clause: {where_clause}")
 
-        # Retrieve with hard filtering if comparative
-        if where_clause and hasattr(retriever, 'search_with_hard_filters'):
+        # Retrieve with hard filtering ONLY for comparative queries
+        # Don't apply hard filters for simple lookups where fuel_type words appear in project names
+        if is_comparative and where_clause and hasattr(retriever, 'search_with_hard_filters'):
             logger.info("Using HARD filtering mode for comparative query")
             docs = retriever.search_with_hard_filters(
                 query,

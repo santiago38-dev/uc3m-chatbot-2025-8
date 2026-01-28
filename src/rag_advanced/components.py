@@ -802,9 +802,10 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
 
-    # Use hard filtering if we have a where clause and retriever supports it
-    if where_clause and hasattr(retriever, 'search_with_hard_filters'):
-        logger.info("Using HARD filtering mode")
+    # Use hard filtering ONLY for comparative queries
+    # Don't apply hard filters for simple lookups where fuel_type words appear in project names
+    if is_comparative and where_clause and hasattr(retriever, 'search_with_hard_filters'):
+        logger.info("Using HARD filtering mode for comparative query")
         # For hard filtering, we retrieve with the filter applied
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
     else:
