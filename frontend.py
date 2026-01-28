@@ -14,6 +14,7 @@ from src.rag_advanced.chain import get_rag_chain
 from src.rag_advanced.components import classify_query
 from src.rag_advanced.utils import RAGMode, set_verbose, detect_language
 from src.vector_store import get_document_content, get_retriever
+from src.chat_history import clear_session_history
 
 K_DOCS = 10
 
@@ -111,12 +112,25 @@ def load_topic_model():
     return load_bertopic("output/bertopic_model.pkl")
 
 @st.cache_resource
-def load_chain(k_docs: int, mode: str, with_summary: bool):
-    """Load retriever + chain only once per process."""
+def load_chain(k_docs: int, mode: str, with_summary: bool, with_history: bool = True):
+    """Load retriever + chain only once per process.
+
+    Args:
+        k_docs: Number of documents to retrieve
+        mode: RAG mode ("flash" or "thinking")
+        with_summary: Whether to include auto-summarization
+        with_history: Whether to enable chat history (set False for stateless/test mode)
+    """
     retriever = get_retriever(k_docs=k_docs)
     # Map string mode to Enum
     rag_mode = RAGMode(mode)
-    chain = get_rag_chain(retriever, mode=rag_mode, k_docs=k_docs, with_summary=with_summary)
+    chain = get_rag_chain(
+        retriever,
+        mode=rag_mode,
+        k_docs=k_docs,
+        with_summary=with_summary,
+        with_history=with_history  # CRITICAL: Pass through to disable history pollution
+    )
     return chain, retriever
 
 
@@ -177,7 +191,18 @@ with st.sidebar:
 
     k_docs = st.slider("Number of retrieved documents", 1, 50, K_DOCS)
 
+    # Stateless mode: Bypass chat history to match backend test behavior
+    # CRITICAL: Enable this to debug hallucination issues caused by history pollution
+    stateless_mode = st.checkbox(
+        "🧪 Stateless mode (no history)",
+        value=False,
+        help="Disables chat history to match backend test configuration. Use this to debug hallucinations."
+    )
+
     if st.button("New chat"):
+        # CRITICAL FIX: Clear BOTH Streamlit UI state AND LangChain's internal history
+        if "session_id" in st.session_state:
+            clear_session_history(st.session_state.session_id)
         st.session_state.clear()
         st.rerun()
 
@@ -290,7 +315,14 @@ with st.sidebar:
 # -------------------------
 # Load chain (cached)
 # -------------------------
-chain, retriever = load_chain(k_docs=k_docs, mode=selected_mode, with_summary=with_summary)
+# CRITICAL FIX: Pass with_history=False when stateless_mode is enabled
+# This matches the backend test configuration where each question gets fresh history
+chain, retriever = load_chain(
+    k_docs=k_docs,
+    mode=selected_mode,
+    with_summary=with_summary,
+    with_history=not stateless_mode  # Disable history in stateless mode
+)
 
 # Session id for RunnableWithMessageHistory (src/chat_history.py)
 if "session_id" not in st.session_state:
