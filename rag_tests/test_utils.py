@@ -128,6 +128,53 @@ class RAGQualityEvaluator:
         # No relevant document found
         return 0.0
 
+    def compute_relaxed_recall(
+        self,
+        retrieved_doc_keys: List[str],
+        relevant_doc_keys: List[str]
+    ) -> float:
+        """
+        Compute Relaxed Recall (Project-Level Match).
+
+        This metric checks if we retrieved ANY chunk from the expected projects,
+        regardless of whether it's the exact section. In RAG, finding the right
+        project is often sufficient since the LLM can answer from any relevant chunk.
+
+        This helps distinguish between:
+        - System failure (not finding correct projects) - needs fixing
+        - Metric definition issue (finding projects but different sections) - system OK
+
+        Args:
+            retrieved_doc_keys: List of keys for retrieved documents
+            relevant_doc_keys: List of keys for relevant documents (Project::INR::Section)
+
+        Returns:
+            Relaxed Recall score (0.0 to 1.0)
+        """
+        if not relevant_doc_keys:
+            return 0.0
+
+        # Extract expected projects from keys (format: Project::INR::Section)
+        expected_projects = set()
+        for key in relevant_doc_keys:
+            parts = key.split("::")
+            if parts:
+                expected_projects.add(parts[0])
+
+        # Extract retrieved projects
+        retrieved_projects = set()
+        for key in retrieved_doc_keys:
+            parts = key.split("::")
+            if parts:
+                retrieved_projects.add(parts[0])
+
+        # Relaxed Recall = projects found / projects expected
+        if not expected_projects:
+            return 0.0
+
+        matches = expected_projects & retrieved_projects
+        return len(matches) / len(expected_projects)
+
     def _extract_atomic_facts(self, text: str) -> List[str]:
         """
         Extract atomic facts from text following FactScore methodology.
@@ -382,6 +429,7 @@ Response:"""
             "lang_accuracy": [],
             "reject_accuracy": [],
             "recall_at_k": {k: [] for k in k_values},
+            "relaxed_recall_at_k": {k: [] for k in k_values},  # Project-level recall
             "mrr": [],
             "factscore": [],
             "bertscore": [],
@@ -431,16 +479,20 @@ Response:"""
             if not case["is_in_scope"]:
                 continue
 
-            # Compute retrieval metrics (Recall@K, MRR)
+            # Compute retrieval metrics (Recall@K, MRR, Relaxed Recall)
             if relevant_doc_keys:
                 for k in k_values:
+                    # Strict Recall (exact section match)
                     recall = self.compute_recall_at_k(docs["keys"], relevant_doc_keys, k)
                     metrics["recall_at_k"][k].append(recall)
+                    # Relaxed Recall (project-level match)
+                    relaxed = self.compute_relaxed_recall(docs["keys"][:k], relevant_doc_keys)
+                    metrics["relaxed_recall_at_k"][k].append(relaxed)
 
                 mrr = self.compute_mrr(docs["keys"], relevant_doc_keys)
                 metrics["mrr"].append(mrr)
-                print(f"  Recall@1: {metrics['recall_at_k'][1][-1]:.2f}, "
-                      f"Recall@5: {metrics['recall_at_k'][5][-1]:.2f}, "
+                print(f"  Strict Recall@5: {metrics['recall_at_k'][5][-1]:.2f}, "
+                      f"Relaxed Recall@5: {metrics['relaxed_recall_at_k'][5][-1]:.2f}, "
                       f"MRR: {mrr:.2f}")
             else:
                 print("  No relevant doc keys provided, skipping retrieval metrics")
@@ -491,6 +543,10 @@ Response:"""
                 k: avg(metrics["recall_at_k"][k])
                 for k in k_values
             },
+            "relaxed_recall_at_k": {
+                k: avg(metrics["relaxed_recall_at_k"][k])
+                for k in k_values
+            },
             "lang_accuracy": avg(metrics["lang_accuracy"]),
             "reject_accuracy": avg(metrics["reject_accuracy"]),
             "mrr": avg(metrics["mrr"]),
@@ -516,10 +572,15 @@ Response:"""
         print(f"{'Reject accuracy':<25} {results['reject_accuracy']:>6.2%}     "
               f"Accuracy for out-of-scope questions detection")
 
-        # Retrieval metrics
+        # Retrieval metrics - Strict (Section-Level)
         for k in k_values:
-            print(f"{'Recall@' + str(k):<25} {results['recall_at_k'][k]:>6.2%}     "
-                  f"Fraction of relevant docs in top {k}")
+            print(f"{'Strict Recall@' + str(k):<25} {results['recall_at_k'][k]:>6.2%}     "
+                  f"Exact section match in top {k}")
+
+        # Retrieval metrics - Relaxed (Project-Level)
+        for k in k_values:
+            print(f"{'Relaxed Recall@' + str(k):<25} {results['relaxed_recall_at_k'][k]:>6.2%}     "
+                  f"Project-level match in top {k}")
 
         print(f"{'Mean Reciprocal Rank (MRR)':<25} {results['mrr']:>6.2%}     "
               f"Average reciprocal rank of first relevant doc")

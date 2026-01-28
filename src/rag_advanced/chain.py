@@ -343,16 +343,29 @@ def create_comparative_filter_hook(
             if where_clause:
                 logger.info(f"ChromaDB where clause: {where_clause}")
 
-        # NUCLEAR OPTION: Pure semantic search - no filters, no dedupe
-        # TODO: Re-enable after baseline is verified
-        logger.info("NUCLEAR OPTION: Using pure semantic search (no hard filters)")
-        docs = retriever.invoke(query)
+        # Retrieve with hard filtering ONLY for comparative queries
+        # Don't apply hard filters for simple lookups where fuel_type words appear in project names
+        k_initial = 50  # Fetch more for reranking
+        if is_comparative and where_clause and hasattr(retriever, 'search_with_hard_filters'):
+            logger.info("Using HARD filtering mode for comparative query")
+            docs = retriever.search_with_hard_filters(query, where=where_clause, k=k_initial)
+        else:
+            # Pure semantic search for simple lookups
+            logger.info("Using pure semantic search (no hard filters)")
+            docs = retriever.invoke(query)
 
-        # DISABLED: Deduplication - may be removing expected docs
-        # original_count = len(docs)
-        # docs = deduplicate_docs_by_inr(docs, max_chunks_per_project=max_chunks_per_project)
-        # if len(docs) < original_count:
-        #     logger.info(f"Deduplicated: {original_count} -> {len(docs)} documents")
+        # === CROSS-ENCODER RERANKING (Critical for precision) ===
+        # Import here to avoid circular imports
+        from .components import rerank_docs
+        pre_rerank = len(docs)
+        docs = rerank_docs(query, docs, top_k=k_total)
+        logger.info(f"Reranked: {pre_rerank} -> {len(docs)} documents")
+
+        # === DEDUPLICATION (after reranking) ===
+        original_count = len(docs)
+        docs = deduplicate_docs_by_inr(docs, max_chunks_per_project=max_chunks_per_project)
+        if len(docs) < original_count:
+            logger.info(f"Deduplicated: {original_count} -> {len(docs)} documents")
 
         # Check for missing entities
         missing_warning = None

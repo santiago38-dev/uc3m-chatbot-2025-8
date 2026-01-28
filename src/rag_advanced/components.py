@@ -23,6 +23,58 @@ from .prompts import (
 
 
 # =============================================================================
+# CROSS-ENCODER RERANKER (Critical for precision)
+# Reranks retrieved chunks so the most relevant is #1
+# =============================================================================
+
+RERANKER = None
+
+try:
+    from sentence_transformers import CrossEncoder
+    RERANKER = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+    print("Cross-encoder reranker loaded successfully")
+except ImportError:
+    print("Warning: sentence-transformers not available. Reranking disabled.")
+except Exception as e:
+    print(f"Warning: Failed to load reranker: {e}")
+
+
+def rerank_docs(query: str, docs: list, top_k: int = 10) -> list:
+    """
+    Rerank documents using cross-encoder for better precision.
+
+    This is CRITICAL for fixing the "Definitions chunk ranks higher than Exhibit C" problem.
+    The cross-encoder scores query-document pairs more accurately than bi-encoder similarity.
+
+    Args:
+        query: The user's question
+        docs: List of retrieved documents
+        top_k: Number of top documents to return after reranking
+
+    Returns:
+        Reranked list of documents (best first)
+    """
+    if not docs:
+        return []
+
+    if RERANKER is None:
+        # Fallback: return top_k without reranking
+        return docs[:top_k]
+
+    try:
+        # Create query-document pairs for cross-encoder scoring
+        pairs = [[query, doc.page_content] for doc in docs]
+        scores = RERANKER.predict(pairs)
+
+        # Sort by score (highest first) and return top_k
+        scored_docs = sorted(zip(docs, scores), key=lambda x: x[1], reverse=True)
+        return [doc for doc, score in scored_docs[:top_k]]
+    except Exception as e:
+        get_logger().warning(f"Reranking failed: {e}")
+        return docs[:top_k]
+
+
+# =============================================================================
 # QUERY CLASSIFICATION FOR ANALYTICS ROUTING
 # Routes queries to: aggregation (analytics JSON) | retrieval (ChromaDB) | hybrid
 # =============================================================================
@@ -796,18 +848,19 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
             logger.info(f"Built ChromaDB where clause: {where_clause}")
 
     # 6. Multi-Query Retrieval
-    # Strategy: Split K total budget across N queries
+    # Strategy: Retrieve MORE docs initially (k=50), then rerank to get best top_k
     num_queries = len(queries)
-    k_per_query = max(1, max_docs // num_queries) if max_docs else None
+    k_initial = 50  # Fetch more for reranking
+    k_per_query = max(1, k_initial // num_queries) if k_initial else None
 
-    logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
+    logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Initial pool: {k_initial})")
 
     # Use hard filtering ONLY for comparative queries
     # Don't apply hard filters for simple lookups where fuel_type words appear in project names
     if is_comparative and where_clause and hasattr(retriever, 'search_with_hard_filters'):
         logger.info("Using HARD filtering mode for comparative query")
         # For hard filtering, we retrieve with the filter applied
-        all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
+        all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=k_initial)
     else:
         # Standard multi-retrieve with boosting
         all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
@@ -819,7 +872,13 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         yield msg
         return
 
-    # === DEDUPLICATION ===
+    # === CROSS-ENCODER RERANKING (Critical for precision) ===
+    # This fixes the "Definitions chunk ranks higher than Exhibit C" problem
+    pre_rerank_count = len(all_docs)
+    all_docs = rerank_docs(question, all_docs, top_k=max_docs or 15)
+    logger.info(f"Reranked: {pre_rerank_count} -> {len(all_docs)} documents (top {max_docs or 15})")
+
+    # === DEDUPLICATION (after reranking) ===
     original_count = len(all_docs)
     all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=2)
     if len(all_docs) < original_count:
