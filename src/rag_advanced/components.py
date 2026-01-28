@@ -118,7 +118,7 @@ AnalyticsQueryType = Literal["aggregation", "retrieval", "hybrid"]
 
 def deduplicate_docs_by_inr(
     docs: List[Document],
-    max_chunks_per_project: int = 2
+    max_chunks_per_project: int = 5
 ) -> List[Document]:
     """
     Limit chunks per project to prevent repetition in LLM output.
@@ -157,14 +157,14 @@ def deduplicate_docs_by_inr(
         if meta.get('nameplate_capacity_mw') or meta.get('capacity_mw'):
             score += 5
 
-        # Prefer certain section types (use section like article_1, exhibit_c)
-        section = str(meta.get('section', '') or meta.get('section_type', '')).lower()
-        if 'schedule' in section:
-            score += 5
+        # Prefer certain section types (Legal Evidence Bias)
+        section = str(meta.get('section_type', '') or meta.get('section', '')).lower()
         if 'exhibit' in section:
-            score += 4
+            score += 10  # Exhibits contain the actual data (security amounts, costs)
+        if 'schedule' in section:
+            score += 8   # Schedules contain structured data tables
         if 'article' in section:
-            score += 3
+            score += 3   # Articles are usually boilerplate
         if 'annex' in section:
             score += 3
 
@@ -583,7 +583,9 @@ def expand_query(question: str) -> List[str]:
     result = call_llm_api_full(prompt)
 
     queries = [q.strip() for q in result.strip().split('\n') if q.strip()]
-    queries = [question] + queries[:3]  # Original + up to 3 variants
+    # Use config value: THINKING_MAX_QUERIES includes original, so we take (N-1) variants
+    max_variants = config.THINKING_MAX_QUERIES - 1  # Reserve 1 slot for original
+    queries = [question] + queries[:max_variants]
 
     logger.success(f"Generated {len(queries)} query variants")
     for i, q in enumerate(queries):
@@ -802,10 +804,9 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
 
-    # Use hard filtering ONLY for comparative queries
-    # Don't apply hard filters for simple lookups where fuel_type words appear in project names
-    if is_comparative and where_clause and hasattr(retriever, 'search_with_hard_filters'):
-        logger.info("Using HARD filtering mode for comparative query")
+    # Use hard filtering if we have a where clause and retriever supports it
+    if where_clause and hasattr(retriever, 'search_with_hard_filters'):
+        logger.info("Using HARD filtering mode")
         # For hard filtering, we retrieve with the filter applied
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
     else:
@@ -821,7 +822,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     # === DEDUPLICATION ===
     original_count = len(all_docs)
-    all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=2)
+    all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=5)
     if len(all_docs) < original_count:
         logger.info(f"Deduplicated: {original_count} -> {len(all_docs)} documents")
 

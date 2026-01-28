@@ -310,7 +310,7 @@ def get_context_for_query(
 
 def create_comparative_filter_hook(
     k_total: int = 15,
-    max_chunks_per_project: int = 2
+    max_chunks_per_project: int = 5
 ) -> Callable:
     """
     Create a filter hook that implements:
