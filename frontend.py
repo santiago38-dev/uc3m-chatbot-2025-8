@@ -143,13 +143,30 @@ def keep_only_last_sources(text: str) -> str:
 # Sidebar: Settings + Upload
 # -------------------------
 with st.sidebar:
-    st.header("⚡ SGIA Intelligence")
+    logo_path = Path(__file__).parent / "ercot_image.png"
+    if logo_path.exists():
+        st.image(str(logo_path), use_container_width=True)
 
-    # Demo mode: hardcode defaults, minimal options
-    selected_mode = "flash"  # hardcode for demo
-    enable_bertopic = False  # disabled for demo
-    with_summary = False
-    show_verbose = False  # hide internal processing for demo
+    st.header("OPTIONS")
+
+    # Mode selection
+    def reset_conversation():
+        st.session_state.messages = []
+        st.session_state.session_id = str(uuid.uuid4())
+
+    mode_options = [m.value for m in RAGMode]
+    selected_mode = st.radio(
+        "Select Mode",
+        mode_options,
+        index=0,
+        format_func=lambda x: x.capitalize(),
+        key="rag_mode_selection",
+        on_change=reset_conversation
+    )
+
+    with_summary = st.toggle("Auto-summarization", value=False)
+    show_verbose = st.checkbox("Show internal processing", value=False)
+    enable_bertopic = False  # BERTopic disabled
 
     k_docs = st.slider("Number of retrieved documents", 1, 50, K_DOCS)
 
@@ -299,12 +316,19 @@ def render_message_structurally(content: str, msg_index: int, topics: list = Non
 
     # --- RENDER ---
 
-    # 1. Main Response
-    st.markdown(main_response)
+    # 1. Main Response - clean up any HTML artifacts for proper markdown rendering
+    # Remove <br> tags that break table formatting
+    clean_response = main_response.replace("<br>", " ").replace("<br/>", " ").replace("<br />", " ")
+    # Clean up any other HTML-like artifacts in tables
+    clean_response = re.sub(r'\s*<[^>]+>\s*', ' ', clean_response)
+    # Normalize multiple spaces
+    clean_response = re.sub(r'  +', ' ', clean_response)
+
+    st.markdown(clean_response)
 
     # 2. Sources (Expander with Buttons)
     if sources_content:
-        with st.expander("📚 Sources / Fuentes"):
+        with st.expander("📚 Sources"):
             # Split lines and render buttons
             lines = sources_content.strip().split('\n')
             for idx, line in enumerate(lines):
