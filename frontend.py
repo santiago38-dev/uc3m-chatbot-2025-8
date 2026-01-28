@@ -335,7 +335,13 @@ def render_message_structurally(content: str, msg_index: int, topics: list = Non
 
     # --- CURRENCY FORMATTING FIX ---
     # Fix spaces in numbers: "15, 368, 453" -> "15,368,453"
-    clean_response = re.sub(r'(\d),\s+(\d)', r'\1,\2', clean_response)
+    # Apply repeatedly until no more changes (handles multiple occurrences like "23, 990, 000")
+    prev = None
+    while prev != clean_response:
+        prev = clean_response
+        # Match digit, comma, any whitespace (including non-breaking space), digit
+        clean_response = re.sub(r'(\d),[\s\u00a0]+(\d)', r'\1,\2', clean_response)
+
     # Add space before parenthesis with number: "453(47" -> "453 (47"
     clean_response = re.sub(r'(\d)\((\d)', r'\1 (\2', clean_response)
     # Add $ to $/kW values in parentheses: "(47.77/kW)" -> "($47.77/kW)"
