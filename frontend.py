@@ -1,4 +1,5 @@
 import hashlib
+import html
 import os
 import re
 import tempfile
@@ -70,21 +71,27 @@ def show_document(project, inr, section):
     # Replace the "---" separator logic from vector_store with a visual separator
     clean_content = content.replace("\n\n---\n\n", "<hr class='doc-separator'>")
 
-    html = f"""
+    # Escape user content to prevent XSS
+    safe_project = html.escape(project)
+    safe_inr = html.escape(inr)
+    safe_section = html.escape(section)
+    safe_content = html.escape(clean_content).replace("\n", "<br>")
+
+    html_block = f"""
     <div class="doc-container">
         <div class="doc-header">
-            <div class="doc-title">{project}</div>
+            <div class="doc-title">{safe_project}</div>
             <div class="doc-meta">
-                <span style="margin-right: 15px;"><strong>INR:</strong> {inr}</span>
-                <span><strong>Section:</strong> {section}</span>
+                <span style="margin-right: 15px;"><strong>INR:</strong> {safe_inr}</span>
+                <span><strong>Section:</strong> {safe_section}</span>
             </div>
         </div>
         <div class="doc-content">
-            {clean_content}
+            {safe_content}
         </div>
     </div>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    st.markdown(html_block, unsafe_allow_html=True)
 
 
 st.set_page_config(page_title="SGIA Intelligence", page_icon="⚡", layout="centered")
@@ -171,8 +178,8 @@ with st.sidebar:
     k_docs = st.slider("Number of retrieved documents", 1, 50, K_DOCS)
 
     if st.button("New chat"):
-            st.session_state.clear()
-            st.rerun()
+        st.session_state.clear()
+        st.rerun()
 
     st.divider()
 
@@ -316,11 +323,13 @@ def render_message_structurally(content: str, msg_index: int, topics: list = Non
 
     # --- RENDER ---
 
-    # 1. Main Response - clean up any HTML artifacts for proper markdown rendering
-    # Remove <br> tags that break table formatting
-    clean_response = main_response.replace("<br>", " ").replace("<br/>", " ").replace("<br />", " ")
-    # Clean up any other HTML-like artifacts in tables
-    clean_response = re.sub(r'\s*<[^>]+>\s*', ' ', clean_response)
+    # 1. Main Response - clean up HTML artifacts that break markdown table rendering
+    # Only remove specific HTML tags that shouldn't appear in markdown
+    clean_response = main_response
+    # Remove <br> variants (common LLM artifact in tables)
+    clean_response = re.sub(r'<br\s*/?>', ' ', clean_response, flags=re.IGNORECASE)
+    # Remove other common HTML tags but NOT < or > alone (preserve math like "<5 MW")
+    clean_response = re.sub(r'</?(?:span|div|p|b|i|u|em|strong)[^>]*>', '', clean_response, flags=re.IGNORECASE)
     # Normalize multiple spaces
     clean_response = re.sub(r'  +', ' ', clean_response)
 
@@ -410,8 +419,8 @@ def parse_log_msg(msg: str) -> str:
                     for k, v in meta_dict.items():
                         formatted_lines.append(f"  - **{k}**: `{v}`")
                     return "\n".join(formatted_lines)
-            except:
-                pass
+            except (ValueError, SyntaxError, TypeError):
+                pass  # Fall through to default formatting
         return f":green[✓ {clean_msg}]"
     elif "[WARN]" in msg:
         clean_msg = msg.split("[WARN]", 1)[1].strip()
@@ -534,7 +543,7 @@ if user_text:
         # Reset verbose to avoid side effects
         set_verbose(False)
 
-    # 5) Save assistant response in UI history
+    # 5) Save assistant response in UI history (including logs for replay)
     formatted_full = keep_only_last_sources(full)
 
     st.session_state.messages.append({
@@ -542,4 +551,5 @@ if user_text:
         "content": formatted_full,
         "topics": topics,
         "followups": questions,
+        "logs": current_logs if show_verbose else [],
     })
