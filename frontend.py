@@ -344,12 +344,10 @@ def render_message_structurally(content: str, msg_index: int, topics: list = Non
 
     # Add space before parenthesis with number: "453(47" -> "453 (47"
     clean_response = re.sub(r'(\d)\((\d)', r'\1 (\2', clean_response)
-    # Add $ to $/kW values in parentheses: "(47.77/kW)" -> "($47.77/kW)"
-    clean_response = re.sub(r'\((\d+\.?\d*)/kW\)', r'($\1/kW)', clean_response)
-    clean_response = re.sub(r'\((\d+\.?\d*)/MW\)', r'($\1/MW)', clean_response)
-    # Add $ to standalone large numbers that look like currency (6+ digits, likely money)
-    # Only if not already prefixed with $ and followed by space or end/punctuation
-    clean_response = re.sub(r'(?<!\$)\b(\d{1,3}(?:,\d{3}){2,})(?=\s|$|\)|\(|\.)', r'$\1', clean_response)
+
+    # Escape $ signs to prevent LaTeX math interpretation in Streamlit
+    # $100 -> \$100 (but preserve already escaped \$)
+    clean_response = re.sub(r'(?<!\\)\$', r'\\$', clean_response)
 
     st.markdown(clean_response)
 
