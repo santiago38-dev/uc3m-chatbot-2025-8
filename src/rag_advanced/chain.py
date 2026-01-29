@@ -313,20 +313,40 @@ def get_analytics_context(analytics: Dict) -> str:
 
     rwe_data = analytics.get("rwe_specific") or specific_devs.get("RWE", {})
     if rwe_data:
-        lines.append("\n### RWE PROJECTS")
+        lines.append("\n### RWE PROJECTS (Q8 reference)")
         lines.append(f"- Project count: {rwe_data.get('project_count', 'N/A')}")
         if rwe_data.get("median_security_per_kw"):
-            lines.append(f"- Median security: ${rwe_data.get('median_security_per_kw')}/kW")
-            vs_market = rwe_data.get("vs_market_median")
-            if vs_market:
-                lines.append(f"- vs Market median: {vs_market}")
+            lines.append(f"- **RWE Median: ${rwe_data.get('median_security_per_kw')}/kW**")
+            lines.append(f"- Range: ${rwe_data.get('min_security_per_kw', 'N/A')} - ${rwe_data.get('max_security_per_kw', 'N/A')}/kW")
+            # Q8 fix: Include explicit comparison statement
+            comparison = rwe_data.get("comparison_statement")
+            if comparison:
+                lines.append(f"- **{comparison}**")
+            vs_corpus = rwe_data.get("vs_corpus_median")
+            assessment = rwe_data.get("assessment")
+            if vs_corpus and assessment:
+                lines.append(f"- Assessment: {assessment} ({vs_corpus} vs corpus median)")
 
     nextera_data = analytics.get("nextera_specific") or specific_devs.get("NEXTERA", {})
     if nextera_data:
         lines.append("\n### NEXTERA PROJECTS")
         lines.append(f"- Project count: {nextera_data.get('project_count', 'N/A')}")
         if nextera_data.get("median_security_per_kw"):
-            lines.append(f"- Median security: ${nextera_data.get('median_security_per_kw')}/kW")
+            lines.append(f"- **NEXTERA Median: ${nextera_data.get('median_security_per_kw')}/kW**")
+            comparison = nextera_data.get("comparison_statement")
+            if comparison:
+                lines.append(f"- **{comparison}**")
+
+    samsung_data = specific_devs.get("SAMSUNG", {})
+    if samsung_data:
+        lines.append("\n### SAMSUNG PROJECTS")
+        lines.append(f"- Project count: {samsung_data.get('project_count', 'N/A')}")
+        if samsung_data.get("median_security_per_kw"):
+            lines.append(f"- **SAMSUNG Median: ${samsung_data.get('median_security_per_kw')}/kW**")
+            lines.append(f"- Range: ${samsung_data.get('min_security_per_kw', 'N/A')} - ${samsung_data.get('max_security_per_kw', 'N/A')}/kW")
+            comparison = samsung_data.get("comparison_statement")
+            if comparison:
+                lines.append(f"- **{comparison}**")
 
     # Data quality notes - handles both "low_sample_categories" and "low_sample_warnings" formats
     quality = analytics.get("data_quality", {})
@@ -571,6 +591,16 @@ def execute_retrieval(
         # Empty retrieval
         pass
 
+    # --- Q5 FIX: Add grounding context for developer comparative queries ---
+    # This creates explicit project-developer mappings to prevent misattribution
+    filters = extract_multi_filters_from_query(query)
+    grounding_context = ""
+    if isinstance(filters.get('parent_company'), list) and len(filters['parent_company']) >= 2:
+        # This is a comparative developer query (e.g., RWE vs SAMSUNG)
+        grounding_context = create_grounding_context(docs)
+        if grounding_context:
+            logger.info("Added grounding context with verified project-developer mappings")
+
     # --- HYBRID PATH: Merge analytics with retrieval ---
     if query_type == "hybrid":
         analytics = load_analytics(analytics_path)
@@ -578,6 +608,8 @@ def execute_retrieval(
             analytics_context = get_analytics_context(analytics)
             context = f"""## CORPUS-WIDE STATISTICS
 {analytics_context}
+
+{grounding_context}
 
 ## RELEVANT DOCUMENT EXCERPTS
 {retrieval['context']}
@@ -588,7 +620,12 @@ def execute_retrieval(
             context = retrieval["context"]
             logger.warning("Analytics unavailable for hybrid mode")
     else:
-        context = retrieval["context"]
+        # Add grounding context for retrieval-only mode too
+        if grounding_context:
+            context = f"{grounding_context}\n\n{retrieval['context']}"
+            retrieval["context"] = context
+        else:
+            context = retrieval["context"]
         logger.success("Using document retrieval with hard filtering")
 
     # --- THRESHOLD QUERY ENHANCEMENT (Critical for Q2/Q19 >$100/kW queries) ---

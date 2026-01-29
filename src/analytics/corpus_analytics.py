@@ -363,13 +363,26 @@ def generate_corpus_analytics(chromadb_path: str = DEFAULT_CHROMADB_PATH) -> Dic
     # Keep top 20 counties
     geographic_concentration = geographic_concentration[:20]
 
-    # --- SPECIFIC DEVELOPERS (RWE and NextEra) ---
+    # --- SPECIFIC DEVELOPERS (RWE, NextEra, Samsung) ---
+    # Q8 fix: Use fuzzy matching to find developers containing target name
     corpus_median = corpus_stats["security_per_kw"]["median"]
     specific_developers = {}
 
-    for target_dev in ["RWE", "NEXTERA"]:
-        if target_dev in developer_security and developer_security[target_dev]:
-            values = developer_security[target_dev]
+    # Helper function to find all security values for developers matching a pattern
+    def get_developer_values_by_pattern(pattern: str) -> Tuple[List[float], int]:
+        """Find all security values for developers containing pattern (case-insensitive)."""
+        values = []
+        project_count = 0
+        pattern_upper = pattern.upper()
+        for dev_name, sec_values in developer_security.items():
+            if pattern_upper in dev_name.upper():
+                values.extend(sec_values)
+                project_count += developer_projects.get(dev_name, 0)
+        return values, project_count
+
+    for target_dev in ["RWE", "NEXTERA", "SAMSUNG"]:
+        values, proj_count = get_developer_values_by_pattern(target_dev)
+        if values:
             stats = compute_statistics(values)
 
             # Calculate vs corpus median
@@ -381,26 +394,32 @@ def generate_corpus_analytics(chromadb_path: str = DEFAULT_CHROMADB_PATH) -> Dic
                 vs_corpus = "N/A"
                 assessment = "INSUFFICIENT_DATA"
 
+            # Q8 fix: Include explicit comparison statement for LLM
+            comparison_statement = None
+            if corpus_median and stats["median"]:
+                if stats["median"] > corpus_median:
+                    comparison_statement = f"{target_dev}'s ${stats['median']:.2f}/kW is ABOVE corpus median ${corpus_median:.2f}/kW"
+                elif stats["median"] < corpus_median:
+                    comparison_statement = f"{target_dev}'s ${stats['median']:.2f}/kW is BELOW corpus median ${corpus_median:.2f}/kW"
+                else:
+                    comparison_statement = f"{target_dev}'s ${stats['median']:.2f}/kW EQUALS corpus median ${corpus_median:.2f}/kW"
+
             specific_developers[target_dev] = {
-                "project_count": developer_projects.get(target_dev, 0),
+                "project_count": proj_count,
                 "projects_with_security_data": stats["n"],
                 "median_security_per_kw": stats["median"],
                 "mean_security_per_kw": stats["mean"],
+                "min_security_per_kw": stats["min"],
+                "max_security_per_kw": stats["max"],
                 "vs_corpus_median": vs_corpus,
                 "assessment": assessment,
+                "comparison_statement": comparison_statement,
+                "corpus_median_for_reference": corpus_median,
                 "n": stats["n"]
             }
-        elif target_dev in developer_projects:
-            # Developer exists but no security data
-            specific_developers[target_dev] = {
-                "project_count": developer_projects.get(target_dev, 0),
-                "projects_with_security_data": 0,
-                "median_security_per_kw": None,
-                "mean_security_per_kw": None,
-                "vs_corpus_median": "N/A",
-                "assessment": "INSUFFICIENT_DATA",
-                "n": 0
-            }
+        else:
+            # Developer not found with fuzzy matching
+            pass
 
     # --- DATA QUALITY FLAGS ---
     data_quality = {
