@@ -331,6 +331,14 @@ Formato ejemplo:
 2. Present a structured comparison (use table or bullet points):
    | Aspect | Entity A | Entity B |
    |--------|----------|----------|
+
+**IMPORTANT: When comparing PROJECTS, ALWAYS include these key attributes first:**
+   - Developer (company name)
+   - Capacity (MW)
+   - Location/Zone (e.g., WEST Texas, COAST, NORTH)
+   - TSP (e.g., ONCOR, CENTERPOINT, AEP)
+   - Security Amount (total $ and $/kW)
+
 3. Highlight key differences and cite sources for each data point
 4. Conclude with the main takeaway""",
 
@@ -339,6 +347,14 @@ Formato ejemplo:
 2. Presenta una comparación estructurada (tabla o viñetas):
    | Aspecto | Entidad A | Entidad B |
    |---------|-----------|-----------|
+
+**IMPORTANTE: Al comparar PROYECTOS, SIEMPRE incluir estos atributos clave primero:**
+   - Developer (nombre de empresa)
+   - Capacidad (MW)
+   - Ubicación/Zona (ej. WEST Texas, COAST, NORTH)
+   - TSP (ej. ONCOR, CENTERPOINT, AEP)
+   - Monto de Seguridad (total $ y $/kW)
+
 3. Destaca diferencias clave y cita fuentes para cada dato
 4. Concluye con la conclusión principal"""
     },
