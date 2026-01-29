@@ -98,8 +98,19 @@ def classify_query(query: str) -> Literal["aggregation", "retrieval", "hybrid"]:
         for pattern in ENTITY_PATTERNS
     )
 
+    # CRITICAL: Threshold queries asking "which projects have >$X/kW" need HYBRID mode
+    # because they need to LIST individual projects, not just show statistics
+    # The analytics JSON doesn't have individual project lists
+    is_threshold_listing_query = bool(re.search(
+        r'which\s+(projects?|facilities?|plants?)\s+have.*(?:over|above|>)\s*\$?\d+',
+        query_lower
+    ))
+
     # Decision logic
-    if aggregation_score >= 2 and not has_specific_entity:
+    if is_threshold_listing_query:
+        # Force HYBRID for threshold listing queries (Q2/Q19)
+        return "hybrid"
+    elif aggregation_score >= 2 and not has_specific_entity:
         return "aggregation"
     elif aggregation_score >= 1 and has_specific_entity:
         return "hybrid"
