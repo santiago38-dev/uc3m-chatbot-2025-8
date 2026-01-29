@@ -977,28 +977,46 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         logger.info(f"Using HARD filtering mode for {filter_type}")
         # For hard filtering, we retrieve with the filter applied
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
+
+        # FALLBACK: If hard filter returns empty, try semantic search without filter
+        # This fixes Q3, Q5, Q14 comparative queries that fail hard filtering
+        if not all_docs:
+            logger.warning(f"Hard filter returned empty for {filter_type}, falling back to semantic search")
+            all_docs = retriever.invoke(question)
+            if all_docs:
+                logger.success(f"Semantic search fallback retrieved {len(all_docs)} documents")
     else:
         # Standard multi-retrieve with boosting
         all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
 
+    # Handle empty retrieval results
+    # For HYBRID queries: Continue with analytics even if docs empty (fixes Q1, Q8)
+    # For pure retrieval: Return fallback message
     if not all_docs:
-        msg = ("No tengo información sobre eso en los documentos disponibles."
-               if lang == 'spanish'
-               else "I don't have information about that in the available documents.")
-        yield msg
-        return
+        if query_type == "hybrid" and analytics_context:
+            logger.warning("No documents retrieved for hybrid query, using analytics only")
+            # Continue - we'll use analytics_context in the response
+        else:
+            msg = ("No tengo información sobre eso en los documentos disponibles."
+                   if lang == 'spanish'
+                   else "I don't have information about that in the available documents.")
+            yield msg
+            return
 
     # === DEDUPLICATION ===
-    original_count = len(all_docs)
-    all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=3)  # Reduced from 5 to prevent LLM duplication (Q20)
-    if len(all_docs) < original_count:
-        logger.info(f"Deduplicated: {original_count} -> {len(all_docs)} documents")
+    # Skip deduplication if no docs (hybrid queries may continue with analytics only)
+    if all_docs:
+        original_count = len(all_docs)
+        all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=3)  # Reduced from 5 to prevent LLM duplication (Q20)
+        if len(all_docs) < original_count:
+            logger.info(f"Deduplicated: {original_count} -> {len(all_docs)} documents")
 
     # === POST-RETRIEVAL THRESHOLD FILTERING (Critical for Q2/Q19) ===
     # Filter out documents that don't meet threshold criteria BEFORE LLM sees them
     # This prevents the LLM from hallucinating projects below the threshold
+    # Skip if no docs (hybrid queries may continue with analytics only)
     security_threshold = metadata_filters.get('security_per_kw_min')
-    if security_threshold:
+    if security_threshold and all_docs:
         pre_filter_count = len(all_docs)
         filtered_docs = []
         for doc in all_docs:
@@ -1032,8 +1050,9 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # Fixed: Use entity_type to correctly detect TSPs vs developers (fixes Q3 ONCOR warning bug)
     # NOTE: Only check for parent_company and tsp_normalized - NOT for fuel_type comparisons
     # fuel_type comparisons (battery vs solar) work via semantic search, not metadata matching
+    # Skip if no docs (hybrid queries may continue with analytics only)
     missing_warning = None
-    if is_comparative:
+    if is_comparative and all_docs:
         requested_entities = []
         entity_type = 'parent_company'  # Default
 
@@ -1055,19 +1074,33 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
                 logger.warning(f"Missing {entity_type} entities in results: {missing}")
 
     # 7. Format sources for response
-    retrieval = format_sources(all_docs)
-    context = retrieval["context"]
+    # Handle empty all_docs for hybrid queries (use analytics only)
+    if all_docs:
+        retrieval = format_sources(all_docs)
+        context = retrieval["context"]
+    else:
+        # Empty docs - create minimal retrieval structure
+        retrieval = {"context": "", "sources": [], "citations": []}
+        context = ""
 
-    # === HYBRID CONTEXT MERGING (Critical for Q7-Q12 comparative analytics) ===
+    # === HYBRID CONTEXT MERGING (Critical for Q1, Q7-Q12 comparative analytics) ===
     # For hybrid queries, prepend analytics context to retrieved documents
     if query_type == "hybrid" and analytics_context:
         logger.info("HYBRID PATH: Merging corpus analytics with document retrieval")
-        context = f"""## CORPUS-WIDE STATISTICS (Pre-computed from ALL 132 projects)
+        if context:
+            # Have both analytics and docs
+            context = f"""## CORPUS-WIDE STATISTICS (Pre-computed from ALL 132 projects)
 {analytics_context}
 
 ## RELEVANT DOCUMENT EXCERPTS (From specific matching projects)
 {context}
 """
+        else:
+            # Analytics only (no docs retrieved)
+            context = f"""## CORPUS-WIDE STATISTICS (Pre-computed from ALL 132 projects)
+{analytics_context}
+"""
+            logger.info("HYBRID PATH: Using analytics only (no documents retrieved)")
         retrieval["context"] = context
 
     # === THRESHOLD QUERY ENHANCEMENT (Critical for Q2/Q19 >$100/kW queries) ===
