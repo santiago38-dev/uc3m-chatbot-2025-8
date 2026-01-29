@@ -14,6 +14,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import statistics
 from collections import defaultdict
 from datetime import datetime
@@ -27,6 +28,15 @@ from chromadb.config import Settings
 DEFAULT_CHROMADB_PATH = os.getenv("CHROMADB_PATH", "./output/chromadb")
 DEFAULT_OUTPUT_PATH = "data/corpus_analytics.json"
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "sgia_chunks")
+
+# =============================================================================
+# KEY DEVELOPERS - Externalized configuration for tracked developers
+# Add new developers here to include them in specific_developers analytics
+# =============================================================================
+KEY_DEVELOPERS = ["RWE", "NEXTERA", "SAMSUNG"]
+
+# Minimum pattern length for fuzzy matching (prevents false positives)
+MIN_PATTERN_LENGTH = 3
 
 # Fuel type code mapping for display
 FUEL_TYPE_DISPLAY = {
@@ -363,24 +373,51 @@ def generate_corpus_analytics(chromadb_path: str = DEFAULT_CHROMADB_PATH) -> Dic
     # Keep top 20 counties
     geographic_concentration = geographic_concentration[:20]
 
-    # --- SPECIFIC DEVELOPERS (RWE, NextEra, Samsung) ---
-    # Q8 fix: Use fuzzy matching to find developers containing target name
+    # --- SPECIFIC DEVELOPERS ---
+    # Uses KEY_DEVELOPERS constant for configuration
+    # Q8 fix: Use word boundary matching to prevent false positives
     corpus_median = corpus_stats["security_per_kw"]["median"]
     specific_developers = {}
 
-    # Helper function to find all security values for developers matching a pattern
     def get_developer_values_by_pattern(pattern: str) -> Tuple[List[float], int]:
-        """Find all security values for developers containing pattern (case-insensitive)."""
+        """
+        Find all security values for developers matching pattern using word boundaries.
+
+        Uses regex word boundary matching (\\b) instead of naive substring matching
+        to prevent false positives (e.g., "AES" matching "CAESAR").
+
+        Args:
+            pattern: Developer name pattern (e.g., "RWE", "SAMSUNG")
+
+        Returns:
+            Tuple of (security_values_list, total_project_count)
+
+        Raises:
+            ValueError: If pattern is shorter than MIN_PATTERN_LENGTH
+        """
+        # Safety guard: reject short patterns that could cause false positives
+        if len(pattern) < MIN_PATTERN_LENGTH:
+            raise ValueError(
+                f"Pattern '{pattern}' is too short (min {MIN_PATTERN_LENGTH} chars). "
+                f"Short patterns risk matching unrelated developer names."
+            )
+
         values = []
         project_count = 0
-        pattern_upper = pattern.upper()
+
+        # Use word boundary regex for safer matching
+        # \b ensures we match whole words, not substrings
+        # e.g., "RWE" matches "RWE Solar Development" but not "CRWEST POWER"
+        pattern_regex = re.compile(rf'\b{re.escape(pattern)}\b', re.IGNORECASE)
+
         for dev_name, sec_values in developer_security.items():
-            if pattern_upper in dev_name.upper():
+            if pattern_regex.search(dev_name):
                 values.extend(sec_values)
                 project_count += developer_projects.get(dev_name, 0)
+
         return values, project_count
 
-    for target_dev in ["RWE", "NEXTERA", "SAMSUNG"]:
+    for target_dev in KEY_DEVELOPERS:
         values, proj_count = get_developer_values_by_pattern(target_dev)
         if values:
             stats = compute_statistics(values)
