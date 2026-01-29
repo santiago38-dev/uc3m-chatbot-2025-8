@@ -766,8 +766,8 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     extracted_filters = input_dict.get("extracted_filters", {})
     is_comparative = input_dict.get("is_comparative", False)
 
-    # Use k_total if provided, else fallback to reasonable default or unlimited
-    max_docs = k_total if k_total else 15
+    # Use k_total if provided, else fallback to config default
+    max_docs = k_total if k_total else config.K_DOCS_DEFAULT
 
     # Detect language
     lang = detect_language(question)
@@ -801,6 +801,14 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         logger.info(f"Detected explicit project name comparison: {metadata_filters['project_name']}")
         # Override is_comparative if we have explicit project names
         is_comparative = True
+
+    # === CRITICAL: Apply K-boost for comparative queries (PARITY WITH FLASH MODE) ===
+    # FLASH mode applies COMPARATIVE_K_MULTIPLIER in create_comparative_filter_hook()
+    # THINKING mode must also boost K to ensure diversity across entities
+    if is_comparative:
+        boosted_k = int(max_docs * config.COMPARATIVE_K_MULTIPLIER)
+        logger.info(f"Comparative query: boosting max_docs from {max_docs} to {boosted_k}")
+        max_docs = boosted_k
 
     # 5. Build hard filter
     # CRITICAL FIX: When explicit project names are specified, use ONLY project_name filter.
@@ -887,6 +895,20 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
             if missing:
                 missing_warning = generate_attribution_warning(missing, found_entities, lang)
                 logger.warning(f"Missing {entity_type} entities in results: {missing}")
+
+        # === BUG FIX: Also check for missing project names ===
+        # When user asks "Compare Headcamp to Quantum", check if both projects are found
+        if has_explicit_project_names and not missing_warning:
+            requested_projects = metadata_filters.get('project_name', [])
+            found_projects = set(doc.metadata.get('project_name', '').upper() for doc in all_docs)
+            missing_projects = [p for p in requested_projects if p.upper() not in found_projects]
+            if missing_projects:
+                found_list = list(set(doc.metadata.get('project_name', '') for doc in all_docs if doc.metadata.get('project_name')))
+                if lang == 'spanish':
+                    missing_warning = f"⚠️ **Advertencia:** No se encontraron documentos para: {', '.join(missing_projects)}. Proyectos encontrados: {', '.join(found_list[:5])}."
+                else:
+                    missing_warning = f"⚠️ **Warning:** No documents found for: {', '.join(missing_projects)}. Projects found: {', '.join(found_list[:5])}."
+                logger.warning(f"Missing project names in results: {missing_projects}")
 
     # 7. Format sources for response
     retrieval = format_sources(all_docs)

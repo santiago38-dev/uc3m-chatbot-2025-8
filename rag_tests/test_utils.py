@@ -33,7 +33,7 @@ class RAGQualityEvaluator:
 
     def __init__(
         self,
-        k_docs: int = 10,
+        k_docs: int = 25,  # Match production default (config.K_DOCS_DEFAULT)
         mode: RAGMode = RAGMode.FLASH,
         with_summary: bool = False
     ):

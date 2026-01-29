@@ -457,7 +457,7 @@ def execute_retrieval(
 
     # Use built-in filter hook if none provided
     if filter_hook is None:
-        filter_hook = create_comparative_filter_hook(k_total=k_total or 15)
+        filter_hook = create_comparative_filter_hook(k_total=k_total or config.K_DOCS_DEFAULT)
 
     # Execute filter hook
     docs, retrieval, missing_warning = filter_hook(query, retriever)
@@ -695,7 +695,7 @@ def get_thinking_chain(
 def get_rag_chain(
     retriever,
     mode: RAGMode = RAGMode.FLASH,
-    k_docs: int = 15,
+    k_docs: int = None,  # Uses config.K_DOCS_DEFAULT if None
     with_history: bool = True,
     with_summary: bool = False,
     analytics_path: str = DEFAULT_ANALYTICS_PATH,
