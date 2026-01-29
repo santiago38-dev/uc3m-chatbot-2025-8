@@ -531,6 +531,7 @@ def execute_retrieval(
     # For threshold queries, get ALL projects meeting the threshold from ChromaDB
     filters = extract_multi_filters_from_query(query)
     security_threshold = filters.get('security_per_kw_min')
+    logger.info(f"DEBUG Threshold: security_threshold={security_threshold}, retriever_type={type(retriever).__name__}, has_method={hasattr(retriever, 'get_all_projects_by_threshold')}")
     if security_threshold and hasattr(retriever, 'get_all_projects_by_threshold'):
         logger.info(f"THRESHOLD QUERY: Getting all projects with security_per_kw >= ${security_threshold}/kW")
         try:
