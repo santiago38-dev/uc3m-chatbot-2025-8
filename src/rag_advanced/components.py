@@ -1046,7 +1046,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # For threshold queries, get ALL projects meeting the threshold from ChromaDB
     # This ensures we don't miss projects that semantic search didn't find
     security_threshold = metadata_filters.get('security_per_kw_min')
-    logger.info(f"DEBUG Threshold: security_threshold={security_threshold}, retriever_type={type(retriever).__name__}, has_method={hasattr(retriever, 'get_all_projects_by_threshold')}")
+    print(f">>> DEBUG Threshold: security_threshold={security_threshold}, retriever_type={type(retriever).__name__}, has_method={hasattr(retriever, 'get_all_projects_by_threshold')}")
     if security_threshold and hasattr(retriever, 'get_all_projects_by_threshold'):
         logger.info(f"THRESHOLD QUERY: Getting all projects with security_per_kw >= ${security_threshold}/kW")
         try:
