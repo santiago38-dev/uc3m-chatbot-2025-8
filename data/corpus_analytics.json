@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-01-27T15:33:07.051199Z",
-  "chromadb_path": "C:/Users/szcas/OneDrive/AI Masters/1. ERCOT_NLP/Github/ercot-lgia-rag-system/output/chromadb",
+  "generated_at": "2026-01-29T19:09:16.229289Z",
+  "chromadb_path": "C:\\Users\\szcas\\OneDrive\\AI Masters\\1. ERCOT_NLP\\Github\\ercot-lgia-rag-system\\output\\chromadb",
   "corpus_stats": {
     "total_projects": 132,
     "total_chunks": 11601,
@@ -20,6 +20,8 @@
       "projects_with_security_data": 34,
       "median_security_per_kw": 86.81,
       "mean_security_per_kw": 101.03,
+      "min_security_per_kw": 0.19,
+      "max_security_per_kw": 213.2,
       "n": 34
     },
     "Wind": {
@@ -27,6 +29,8 @@
       "projects_with_security_data": 5,
       "median_security_per_kw": 52.13,
       "mean_security_per_kw": 54.27,
+      "min_security_per_kw": 8.54,
+      "max_security_per_kw": 122.1,
       "n": 5
     },
     "Gas": {
@@ -34,6 +38,8 @@
       "projects_with_security_data": 4,
       "median_security_per_kw": 69.56,
       "mean_security_per_kw": 73.5,
+      "min_security_per_kw": 5.96,
+      "max_security_per_kw": 148.9,
       "n": 4
     },
     "Battery": {
@@ -41,10 +47,33 @@
       "projects_with_security_data": 35,
       "median_security_per_kw": 58.54,
       "mean_security_per_kw": 61.07,
+      "min_security_per_kw": 0.65,
+      "max_security_per_kw": 183.27,
       "n": 35
     }
   },
   "by_zone": {
+    "PANHANDLE": {
+      "count": 2,
+      "projects_with_security_data": 1,
+      "median_security_per_kw": 20.0,
+      "mean_security_per_kw": 20.0,
+      "n": 1
+    },
+    "OTHER": {
+      "count": 3,
+      "projects_with_security_data": 3,
+      "median_security_per_kw": 40.27,
+      "mean_security_per_kw": 45.53,
+      "n": 3
+    },
+    "WEST": {
+      "count": 17,
+      "projects_with_security_data": 5,
+      "median_security_per_kw": 47.77,
+      "mean_security_per_kw": 82.57,
+      "n": 5
+    },
     "SOUTH": {
       "count": 29,
       "projects_with_security_data": 14,
@@ -59,33 +88,12 @@
       "mean_security_per_kw": 100.05,
       "n": 31
     },
-    "OTHER": {
-      "count": 3,
-      "projects_with_security_data": 3,
-      "median_security_per_kw": 40.27,
-      "mean_security_per_kw": 45.53,
-      "n": 3
-    },
     "COAST": {
       "count": 45,
       "projects_with_security_data": 24,
       "median_security_per_kw": 37.78,
       "mean_security_per_kw": 58.62,
       "n": 24
-    },
-    "WEST": {
-      "count": 17,
-      "projects_with_security_data": 5,
-      "median_security_per_kw": 47.77,
-      "mean_security_per_kw": 82.57,
-      "n": 5
-    },
-    "PANHANDLE": {
-      "count": 2,
-      "projects_with_security_data": 1,
-      "median_security_per_kw": 20.0,
-      "mean_security_per_kw": 20.0,
-      "n": 1
     }
   },
   "tsp_rankings": [
@@ -308,6 +316,12 @@
       },
       {
         "category": "zone",
+        "bucket": "PANHANDLE",
+        "sample_size": 1,
+        "warning": "Low sample size (n=1 < 10)"
+      },
+      {
+        "category": "zone",
         "bucket": "OTHER",
         "sample_size": 3,
         "warning": "Low sample size (n=3 < 10)"
@@ -317,12 +331,6 @@
         "bucket": "WEST",
         "sample_size": 5,
         "warning": "Low sample size (n=5 < 10)"
-      },
-      {
-        "category": "zone",
-        "bucket": "PANHANDLE",
-        "sample_size": 1,
-        "warning": "Low sample size (n=1 < 10)"
       },
       {
         "category": "tsp",
