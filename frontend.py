@@ -13,7 +13,7 @@ from src.add_documents import add_files
 from src.rag_advanced.chain import get_rag_chain
 from src.rag_advanced.components import classify_query
 from src.rag_advanced.utils import RAGMode, set_verbose, detect_language
-from src.vector_store import get_document_content, get_retriever
+from src.vector_store import get_document_content, get_smart_retriever
 from src.chat_history import clear_session_history
 
 # CRITICAL: K_DOCS must be >= 5x max_chunks_per_project (5) for comparative query diversity
@@ -123,7 +123,9 @@ def load_chain(k_docs: int, mode: str, with_summary: bool, with_history: bool = 
         with_summary: Whether to include auto-summarization
         with_history: Whether to enable chat history (set False for stateless/test mode)
     """
-    retriever = get_retriever(k_docs=k_docs)
+    # CRITICAL: Use SmartRetriever to enable search_with_hard_filters for project_name filtering
+    # This prevents noise document pollution in comparative queries
+    retriever = get_smart_retriever(k_docs=k_docs)
     # Map string mode to Enum
     rag_mode = RAGMode(mode)
     chain = get_rag_chain(
