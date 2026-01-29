@@ -56,12 +56,22 @@ ANALYTICS_SYSTEM_PROMPT_EN = """You are an ERCOT interconnection intelligence an
    - Use for: legal language, specific project details, clause comparisons
 
 When answering:
-- For statistical questions, cite the analytics data explicitly
+- For statistical questions, cite the analytics data explicitly with exact values
 - For legal/contractual questions, quote from retrieved documents
 - For comparative questions (e.g., "RWE vs market"), use BOTH sources
 - Always clarify the data source: "Based on corpus analytics..." or "From the SGIA document..."
 
-If the analytics don't contain data needed to answer, say so clearly rather than estimating.
+COMPARATIVE QUERIES (Q5 fix): When comparing two entities (e.g., RWE vs SAMSUNG):
+- Provide analysis based on available data, even if one entity has limited data
+- Do NOT excessively hedge - if you have data for one entity, present it confidently
+- Note data limitations factually, but still provide substantive comparison
+- Focus on what you CAN compare rather than what's missing
+
+ANOMALY/UNUSUAL CLAUSE QUERIES (Q21 fix): When identifying unusual clauses:
+- Be thorough and specific - list at least 5-8 distinct unusual provisions if found
+- Include specific clause names, section numbers, and implications
+- Explain WHY each clause is unusual compared to standard ERCOT agreements
+- Cover categories: liability, termination, force majeure, notice periods, assignment rights
 
 IMPORTANT: All statistics include sample sizes (n=). When n < 10, note the limited sample size.
 """
@@ -76,12 +86,22 @@ ANALYTICS_SYSTEM_PROMPT_ES = """Eres un analista de inteligencia de interconexi�
    - Usar para: lenguaje legal, detalles específicos de proyectos, comparaciones de cláusulas
 
 Al responder:
-- Para preguntas estadísticas, cita los datos analíticos explícitamente
+- Para preguntas estadísticas, cita los datos analíticos explícitamente con valores exactos
 - Para preguntas legales/contractuales, cita los documentos recuperados
 - Para preguntas comparativas (ej: "RWE vs mercado"), usa AMBAS fuentes
 - Siempre aclara la fuente: "Según las analíticas del corpus..." o "Del documento SGIA..."
 
-Si las analíticas no contienen los datos necesarios, dilo claramente en lugar de estimar.
+CONSULTAS COMPARATIVAS: Al comparar dos entidades (ej: RWE vs SAMSUNG):
+- Proporciona análisis basado en datos disponibles, incluso si una entidad tiene datos limitados
+- NO cubras excesivamente - si tienes datos de una entidad, preséntalos con confianza
+- Nota las limitaciones de datos de forma factual, pero proporciona comparación sustantiva
+- Enfócate en lo que PUEDES comparar en lugar de lo que falta
+
+CONSULTAS DE ANOMALÍAS/CLÁUSULAS INUSUALES: Al identificar cláusulas inusuales:
+- Sé exhaustivo y específico - lista al menos 5-8 disposiciones inusuales distintas si se encuentran
+- Incluye nombres de cláusulas específicas, números de sección e implicaciones
+- Explica POR QUÉ cada cláusula es inusual comparada con acuerdos ERCOT estándar
+- Cubre categorías: responsabilidad, terminación, fuerza mayor, períodos de notificación, derechos de cesión
 
 IMPORTANTE: Todas las estadísticas incluyen tamaños de muestra (n=). Cuando n < 10, nota el tamaño de muestra limitado.
 """
@@ -117,10 +137,20 @@ def format_fuel_stats(fuel_data: Dict) -> str:
     lines = []
     for fuel_type, data in sorted(fuel_data.items(), key=lambda x: x[1].get("count", 0), reverse=True):
         if data.get("median_security_per_kw") is not None:
-            lines.append(
-                f"- {fuel_type}: {data['count']} projects, "
-                f"median ${data['median_security_per_kw']}/kW (n={data.get('n', 'N/A')})"
-            )
+            # Include min/max range if available (Q10 fix)
+            min_val = data.get("min_security_per_kw")
+            max_val = data.get("max_security_per_kw")
+            if min_val is not None and max_val is not None:
+                lines.append(
+                    f"- **{fuel_type}**: {data['count']} projects, "
+                    f"median ${data['median_security_per_kw']}/kW, "
+                    f"range ${min_val}-${max_val}/kW (n={data.get('n', 'N/A')})"
+                )
+            else:
+                lines.append(
+                    f"- **{fuel_type}**: {data['count']} projects, "
+                    f"median ${data['median_security_per_kw']}/kW (n={data.get('n', 'N/A')})"
+                )
         else:
             lines.append(f"- {fuel_type}: {data['count']} projects (no security data)")
     return "\n".join(lines)
@@ -209,13 +239,23 @@ def get_analytics_context(analytics: Dict) -> str:
     # Summary stats - handles both "summary" and "corpus_stats" keys
     summary = analytics.get("summary") or analytics.get("corpus_stats", {})
     if summary:
+        sec_stats = summary.get("security_per_kw", {})
+
+        # Q8 fix: Add prominent instruction to use exact values
+        lines.append("### ⚠️ IMPORTANT: USE THESE EXACT PRE-COMPUTED VALUES")
+        lines.append("Do NOT compute statistics from documents. Use these corpus-wide figures:")
+        if sec_stats:
+            lines.append(f"- **CORPUS MEDIAN: ${sec_stats.get('median', 'N/A')}/kW** (use this for market comparisons)")
+            lines.append(f"- CORPUS MEAN: ${sec_stats.get('mean', 'N/A')}/kW")
+            lines.append(f"- CORPUS RANGE: ${sec_stats.get('min', 'N/A')} - ${sec_stats.get('max', 'N/A')}/kW")
+        lines.append("")
+
         lines.append("### CORPUS SUMMARY")
         lines.append(f"- Total projects: {summary.get('total_projects', 'N/A')}")
         # Handle both key names for security data count
         sec_count = summary.get('projects_with_security') or summary.get('projects_with_security_data', 'N/A')
         lines.append(f"- Projects with security data: {sec_count}")
 
-        sec_stats = summary.get("security_per_kw", {})
         if sec_stats:
             lines.append(f"- **Median security cost: ${sec_stats.get('median', 'N/A')}/kW** (n={sec_stats.get('n', 'N/A')})")
             lines.append(f"- Mean: ${sec_stats.get('mean', 'N/A')}/kW, Range: ${sec_stats.get('min', 'N/A')} - ${sec_stats.get('max', 'N/A')}/kW")

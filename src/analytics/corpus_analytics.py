@@ -202,6 +202,8 @@ def generate_corpus_analytics(chromadb_path: str = DEFAULT_CHROMADB_PATH) -> Dic
             "projects_with_security_data": stats["n"],
             "median_security_per_kw": stats["median"],
             "mean_security_per_kw": stats["mean"],
+            "min_security_per_kw": stats["min"],  # Q10 fix: add min/max ranges
+            "max_security_per_kw": stats["max"],  # Q10 fix: add min/max ranges
             "n": stats["n"]
         }
 
@@ -214,6 +216,8 @@ def generate_corpus_analytics(chromadb_path: str = DEFAULT_CHROMADB_PATH) -> Dic
                 "projects_with_security_data": 0,
                 "median_security_per_kw": None,
                 "mean_security_per_kw": None,
+                "min_security_per_kw": None,
+                "max_security_per_kw": None,
                 "n": 0
             }
 
