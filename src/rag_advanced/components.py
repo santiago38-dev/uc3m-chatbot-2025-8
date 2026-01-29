@@ -668,7 +668,15 @@ def multi_retrieve(queries: List[str], retriever, filters: Dict[str, Any] = None
 # --- METADATA EXTRACTION ---
 
 def extract_query_metadata(question: str) -> Dict[str, Any]:
-    """Extract metadata filters from the question using LLM."""
+    """Extract metadata filters from the question using LLM.
+
+    CRITICAL: Post-processes LLM output to filter out generic fuel type terms
+    (e.g., "battery", "solar") that the LLM incorrectly extracts as project names.
+    This prevents false positive warnings in the project name comparison logic.
+    """
+    # Import here to avoid circular imports
+    from .filter_utils import filter_project_names
+
     logger = get_logger()
     logger.step("Extracting metadata filters from question...")
 
@@ -717,6 +725,28 @@ def extract_query_metadata(question: str) -> Dict[str, Any]:
 
         # Filter out empty or null values
         metadata = {k: v for k, v in metadata.items() if v}
+
+        # === CRITICAL FIX: Filter out generic fuel type terms from project_name ===
+        # The LLM sometimes extracts "battery", "solar" as project names when user asks
+        # about "battery and solar projects". These are NOT actual project names.
+        if 'project_name' in metadata:
+            raw_names = metadata['project_name']
+            if isinstance(raw_names, list):
+                filtered_names = filter_project_names(raw_names)
+                if filtered_names:
+                    metadata['project_name'] = filtered_names
+                    if len(filtered_names) < len(raw_names):
+                        logger.info(f"Filtered project_name: {raw_names} -> {filtered_names}")
+                else:
+                    # All names were generic terms - remove the key entirely
+                    del metadata['project_name']
+                    logger.info(f"Removed all generic terms from project_name: {raw_names}")
+            elif isinstance(raw_names, str):
+                # Single string - check if it's generic
+                from .filter_utils import is_generic_fuel_term
+                if is_generic_fuel_term(raw_names):
+                    del metadata['project_name']
+                    logger.info(f"Removed generic term from project_name: {raw_names}")
 
         if metadata:
             logger.success(f"Extracted metadata: {metadata}")
@@ -890,18 +920,26 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
         # === BUG FIX: Also check for missing project names ===
         # When user asks "Compare Headcamp to Quantum", check if both projects are found
+        # CRITICAL: Only check if we have REAL project names (not generic terms like "battery")
         if has_explicit_project_names and not missing_warning:
             requested_projects = metadata_filters.get('project_name', [])
-            # Handle None values to prevent AttributeError on .upper()
-            found_projects = set((doc.metadata.get('project_name') or '').upper() for doc in all_docs)
-            missing_projects = [p for p in requested_projects if p.upper() not in found_projects]
-            if missing_projects:
-                found_list = list(set(doc.metadata.get('project_name') or '' for doc in all_docs if doc.metadata.get('project_name')))
-                if lang == 'spanish':
-                    missing_warning = f"⚠️ **Advertencia:** No se encontraron documentos para: {', '.join(missing_projects)}. Proyectos encontrados: {', '.join(found_list[:5])}."
-                else:
-                    missing_warning = f"⚠️ **Warning:** No documents found for: {', '.join(missing_projects)}. Projects found: {', '.join(found_list[:5])}."
-                logger.warning(f"Missing project names in results: {missing_projects}")
+
+            # Double-check: filter out any generic terms that might have slipped through
+            from .filter_utils import filter_project_names
+            requested_projects = filter_project_names(requested_projects) if isinstance(requested_projects, list) else []
+
+            # Only proceed if we still have real project names after filtering
+            if len(requested_projects) >= 2:
+                # Handle None values to prevent AttributeError on .upper()
+                found_projects = set((doc.metadata.get('project_name') or '').upper() for doc in all_docs)
+                missing_projects = [p for p in requested_projects if p.upper() not in found_projects]
+                if missing_projects:
+                    found_list = list(set(doc.metadata.get('project_name') or '' for doc in all_docs if doc.metadata.get('project_name')))
+                    if lang == 'spanish':
+                        missing_warning = f"⚠️ **Advertencia:** No se encontraron documentos para: {', '.join(missing_projects)}. Proyectos encontrados: {', '.join(found_list[:5])}."
+                    else:
+                        missing_warning = f"⚠️ **Warning:** No documents found for: {', '.join(missing_projects)}. Projects found: {', '.join(found_list[:5])}."
+                    logger.warning(f"Missing project names in results: {missing_projects}")
 
     # 7. Format sources for response
     retrieval = format_sources(all_docs)

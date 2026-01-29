@@ -6,12 +6,88 @@ This module is imported by both vector_store.py and chain.py.
 """
 
 import re
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Set
 
 from .alias_expander import (
     expand_parent_company_aliases,
     expand_tsp_aliases
 )
+
+
+# =============================================================================
+# FUEL TYPE KEYWORDS - Single source of truth
+# These are generic technology terms that should NEVER be treated as project names
+# Used to prevent false positives in LLM metadata extraction
+# =============================================================================
+
+FUEL_TYPE_KEYWORDS: Set[str] = {
+    # English
+    'battery', 'batteries', 'storage', 'bess', 'energy storage',
+    'solar', 'photovoltaic', 'pv', 'sun',
+    'wind', 'turbine', 'turbines',
+    'gas', 'natural gas', 'ng', 'combined cycle', 'peaker',
+    # Spanish
+    'bateria', 'baterias', 'almacenamiento',
+    'solares', 'fotovoltaico', 'fotovoltaica',
+    'viento', 'vientos', 'eolico', 'eolica',
+    # Generic terms that are NOT project names
+    'project', 'projects', 'proyecto', 'proyectos',
+    'plant', 'plants', 'facility', 'facilities',
+    'farm', 'farms', 'park', 'parks',
+}
+
+
+def is_generic_fuel_term(term: str) -> bool:
+    """
+    Check if a term is a generic fuel type or technology keyword.
+
+    These should NOT be treated as project names by LLM metadata extraction.
+
+    Args:
+        term: The term to check (e.g., "battery", "solar", "Headcamp")
+
+    Returns:
+        True if the term is generic and should be filtered out
+    """
+    if not term:
+        return True
+
+    term_lower = term.lower().strip()
+
+    # Direct match
+    if term_lower in FUEL_TYPE_KEYWORDS:
+        return True
+
+    # Partial match for compound terms (e.g., "solar project")
+    for keyword in FUEL_TYPE_KEYWORDS:
+        if term_lower == keyword:
+            return True
+
+    # Very short terms are likely generic (e.g., "PV", "WT")
+    if len(term_lower) <= 2:
+        return True
+
+    return False
+
+
+def filter_project_names(names: List[str]) -> List[str]:
+    """
+    Filter out generic fuel type terms from a list of extracted project names.
+
+    This is critical for preventing false positives in the project name warning system.
+    The LLM sometimes extracts "battery", "solar" as project names when the user
+    asks about "battery and solar projects" - this filters those out.
+
+    Args:
+        names: List of extracted "project names" from LLM
+
+    Returns:
+        Filtered list with only likely real project names
+    """
+    if not names:
+        return []
+
+    return [name for name in names if not is_generic_fuel_term(name)]
 
 
 # =============================================================================

@@ -340,6 +340,12 @@ def create_comparative_filter_hook(
             isinstance(filters.get('fuel_type'), list)
         )
 
+        # === CRITICAL FIX: INR lookups should also use hard filtering ===
+        # When user asks about a specific INR (e.g., "25INR0138"), we MUST use
+        # hard filtering to guarantee finding that exact project.
+        # Soft boosting doesn't guarantee the specific project is in results.
+        has_inr_filter = 'inr' in filters
+
         # DYNAMIC K BOOSTING: Increase k for comparative queries to ensure diversity
         # This prevents the "Top-K Squeeze" where one project consumes all slots
         k_for_retrieval = effective_k
@@ -353,14 +359,19 @@ def create_comparative_filter_hook(
             if where_clause:
                 logger.info(f"ChromaDB where clause: {where_clause}")
 
-        # Retrieve with hard filtering ONLY for comparative queries
+        # Retrieve with hard filtering for:
+        # 1. Comparative queries (multiple developers/TSPs/fuel types)
+        # 2. INR lookups (must find exact project)
         # Don't apply hard filters for simple lookups where fuel_type words appear in project names
-        if is_comparative and where_clause and hasattr(retriever, 'search_with_hard_filters'):
-            logger.info("Using HARD filtering mode for comparative query")
+        use_hard_filter = (is_comparative or has_inr_filter) and where_clause and hasattr(retriever, 'search_with_hard_filters')
+
+        if use_hard_filter:
+            filter_reason = "comparative query" if is_comparative else f"INR lookup ({filters.get('inr')})"
+            logger.info(f"Using HARD filtering mode for {filter_reason}")
             docs = retriever.search_with_hard_filters(
                 query,
                 where=where_clause,
-                k=k_for_retrieval  # Use boosted K
+                k=k_for_retrieval  # Use boosted K for comparative, normal K for INR
             )
         else:
             docs = retriever.invoke(query)
