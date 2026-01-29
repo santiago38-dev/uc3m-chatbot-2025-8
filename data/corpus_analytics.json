@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-01-29T19:09:16.229289Z",
+  "generated_at": "2026-01-29T23:43:56.466755Z",
   "chromadb_path": "C:\\Users\\szcas\\OneDrive\\AI Masters\\1. ERCOT_NLP\\Github\\ercot-lgia-rag-system\\output\\chromadb",
   "corpus_stats": {
     "total_projects": 132,
@@ -53,26 +53,12 @@
     }
   },
   "by_zone": {
-    "PANHANDLE": {
-      "count": 2,
-      "projects_with_security_data": 1,
-      "median_security_per_kw": 20.0,
-      "mean_security_per_kw": 20.0,
-      "n": 1
-    },
-    "OTHER": {
-      "count": 3,
-      "projects_with_security_data": 3,
-      "median_security_per_kw": 40.27,
-      "mean_security_per_kw": 45.53,
-      "n": 3
-    },
-    "WEST": {
-      "count": 17,
-      "projects_with_security_data": 5,
-      "median_security_per_kw": 47.77,
-      "mean_security_per_kw": 82.57,
-      "n": 5
+    "COAST": {
+      "count": 45,
+      "projects_with_security_data": 24,
+      "median_security_per_kw": 37.78,
+      "mean_security_per_kw": 58.62,
+      "n": 24
     },
     "SOUTH": {
       "count": 29,
@@ -88,12 +74,26 @@
       "mean_security_per_kw": 100.05,
       "n": 31
     },
-    "COAST": {
-      "count": 45,
-      "projects_with_security_data": 24,
-      "median_security_per_kw": 37.78,
-      "mean_security_per_kw": 58.62,
-      "n": 24
+    "WEST": {
+      "count": 17,
+      "projects_with_security_data": 5,
+      "median_security_per_kw": 47.77,
+      "mean_security_per_kw": 82.57,
+      "n": 5
+    },
+    "PANHANDLE": {
+      "count": 2,
+      "projects_with_security_data": 1,
+      "median_security_per_kw": 20.0,
+      "mean_security_per_kw": 20.0,
+      "n": 1
+    },
+    "OTHER": {
+      "count": 3,
+      "projects_with_security_data": 3,
+      "median_security_per_kw": 40.27,
+      "mean_security_per_kw": 45.53,
+      "n": 3
     }
   },
   "tsp_rankings": [
@@ -299,7 +299,34 @@
       "n": 2
     }
   ],
-  "specific_developers": {},
+  "specific_developers": {
+    "RWE": {
+      "project_count": 2,
+      "projects_with_security_data": 2,
+      "median_security_per_kw": 62.09,
+      "mean_security_per_kw": 62.09,
+      "min_security_per_kw": 60.46,
+      "max_security_per_kw": 63.71,
+      "vs_corpus_median": "-2.3%",
+      "assessment": "BELOW_MARKET",
+      "comparison_statement": "RWE's $62.09/kW is BELOW corpus median $63.58/kW",
+      "corpus_median_for_reference": 63.58,
+      "n": 2
+    },
+    "SAMSUNG": {
+      "project_count": 1,
+      "projects_with_security_data": 1,
+      "median_security_per_kw": 43.55,
+      "mean_security_per_kw": 43.55,
+      "min_security_per_kw": 43.55,
+      "max_security_per_kw": 43.55,
+      "vs_corpus_median": "-31.5%",
+      "assessment": "BELOW_MARKET",
+      "comparison_statement": "SAMSUNG's $43.55/kW is BELOW corpus median $63.58/kW",
+      "corpus_median_for_reference": 63.58,
+      "n": 1
+    }
+  },
   "data_quality": {
     "low_sample_warnings": [
       {
@@ -316,6 +343,12 @@
       },
       {
         "category": "zone",
+        "bucket": "WEST",
+        "sample_size": 5,
+        "warning": "Low sample size (n=5 < 10)"
+      },
+      {
+        "category": "zone",
         "bucket": "PANHANDLE",
         "sample_size": 1,
         "warning": "Low sample size (n=1 < 10)"
@@ -325,12 +358,6 @@
         "bucket": "OTHER",
         "sample_size": 3,
         "warning": "Low sample size (n=3 < 10)"
-      },
-      {
-        "category": "zone",
-        "bucket": "WEST",
-        "sample_size": 5,
-        "warning": "Low sample size (n=5 < 10)"
       },
       {
         "category": "tsp",
@@ -361,6 +388,18 @@
         "bucket": "AEP",
         "sample_size": 3,
         "warning": "Low sample size (n=3 < 10)"
+      },
+      {
+        "category": "specific_developer",
+        "bucket": "RWE",
+        "sample_size": 2,
+        "warning": "Low sample size (n=2 < 10)"
+      },
+      {
+        "category": "specific_developer",
+        "bucket": "SAMSUNG",
+        "sample_size": 1,
+        "warning": "Low sample size (n=1 < 10)"
       }
     ],
     "missing_data_warnings": [
