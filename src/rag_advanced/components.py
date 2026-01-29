@@ -797,6 +797,26 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         if where_clause:
             logger.info(f"Built ChromaDB where clause: {where_clause}")
 
+    # === CRITICAL FIX: Use LLM-extracted project_name for hard filtering ===
+    # When explicit project names are mentioned (e.g., "Compare Headcamp to Quantum"),
+    # we MUST filter to only those projects to prevent noise document pollution.
+    if metadata_filters.get('project_name') and is_comparative:
+        project_names = metadata_filters['project_name']
+        if isinstance(project_names, list) and len(project_names) >= 2:
+            # Build project_name filter using regex pattern matching
+            # ChromaDB doesn't support LIKE, so we use $in with extracted names
+            project_filter = {'project_name': {'$in': project_names}}
+            logger.info(f"Adding project_name hard filter: {project_filter}")
+
+            if where_clause:
+                # Merge with existing where clause using $and
+                if '$and' in where_clause:
+                    where_clause['$and'].append(project_filter)
+                else:
+                    where_clause = {'$and': [where_clause, project_filter]}
+            else:
+                where_clause = project_filter
+
     # 6. Multi-Query Retrieval
     # Strategy: Split K total budget across N queries
     num_queries = len(queries)
