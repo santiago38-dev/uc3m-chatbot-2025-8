@@ -315,6 +315,73 @@ class SmartRetriever:
         """LangChain retriever interface compatibility."""
         return self._search(query)
 
+    def get_all_projects_by_threshold(
+        self,
+        threshold_field: str,
+        threshold_value: float,
+        operator: str = "$gte"
+    ) -> List[Dict[str, Any]]:
+        """
+        Get ALL unique projects meeting a threshold criteria.
+
+        This bypasses semantic search to directly query metadata for
+        threshold queries like "projects with >$100/kW".
+
+        Args:
+            threshold_field: Metadata field to filter (e.g., 'security_per_kw')
+            threshold_value: Numeric threshold value
+            operator: Comparison operator ('$gte', '$gt', '$lte', '$lt')
+
+        Returns:
+            List of unique project dicts with key metadata
+        """
+        try:
+            # Access underlying Chroma collection
+            collection = self.vectorstore._collection
+
+            # Query with numeric filter - get more results to ensure we find all projects
+            where_clause = {threshold_field: {operator: threshold_value}}
+
+            results = collection.get(
+                where=where_clause,
+                include=["metadatas"]
+            )
+
+            # Extract unique projects with their metadata
+            seen_projects = set()
+            unique_projects = []
+
+            for metadata in results.get('metadatas', []):
+                project_name = metadata.get('project_name', '')
+                inr = metadata.get('inr', '')
+                key = f"{project_name}|{inr}"
+
+                if key not in seen_projects and project_name:
+                    seen_projects.add(key)
+                    unique_projects.append({
+                        'project_name': project_name,
+                        'inr': inr,
+                        'developer': metadata.get('developer_spv', metadata.get('parent_company', 'N/A')),
+                        'fuel_type': metadata.get('fuel_type', 'N/A'),
+                        'zone': metadata.get('zone', 'N/A'),
+                        'capacity_mw': metadata.get('capacity_mw', 'N/A'),
+                        'security_amount': metadata.get('security_amount', 'N/A'),
+                        'security_per_kw': metadata.get('security_per_kw', 'N/A'),
+                        'tsp': metadata.get('tsp_normalized', metadata.get('tsp', 'N/A'))
+                    })
+
+            # Sort by security_per_kw descending
+            unique_projects.sort(
+                key=lambda x: x.get('security_per_kw', 0) if x.get('security_per_kw') != 'N/A' else 0,
+                reverse=True
+            )
+
+            return unique_projects
+
+        except Exception as e:
+            print(f"Warning: Threshold query failed ({e})")
+            return []
+
 
 def get_smart_retriever(
     k_docs: int = 20,  # Increased from 15 for better coverage

@@ -44,14 +44,17 @@ AGGREGATION_SIGNALS = [
     r'\bmarket (average|median|rate)\b',
 
     # Specific aggregation questions
-    r'\bwhich (developers?|companies|tsps?|counties|zones?) have\b',
+    r'\bwhich (developers?|companies|tsps?|counties|zones?|projects?) have\b',
     r'\bgeographic (concentration|distribution|patterns?)\b',
     r'\bdiversified (portfolio|mix)\b',
     r'\bmulti[- ]?zone\b',
     r'\b(typical|standard|normal) (security|cost|rate)\b',
 
     # ERCOT-specific aggregation
-    r'\b(security cost|security deposit|security amount).*(per kw|per mw|\$/kw|\$/mw)\b',
+    r'\b(security costs?|security deposits?|security amounts?).*(per kw|per mw|\$/kw|\$/mw)\b',
+    # Threshold queries on $/kW should use analytics (has pre-computed values for all projects)
+    r'\b(over|above|greater|more than|>\s*)\$?\d+[/\\](kw|mw)\b',
+    r'\bsecurity.*(over|above|greater|more than|>\s*)\$?\d+\b',
     r'\btsp.*(ranking|comparison|average|median)\b',
     r'\bzone.*(comparison|average|median|breakdown)\b',
 ]
@@ -1027,6 +1030,34 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 {context}
 """
         retrieval["context"] = context
+
+    # === THRESHOLD QUERY ENHANCEMENT (Critical for Q2/Q19 >$100/kW queries) ===
+    # For threshold queries, get ALL projects meeting the threshold from ChromaDB
+    # This ensures we don't miss projects that semantic search didn't find
+    security_threshold = metadata_filters.get('security_per_kw_min')
+    if security_threshold and hasattr(retriever, 'get_all_projects_by_threshold'):
+        logger.info(f"THRESHOLD QUERY: Getting all projects with security_per_kw >= ${security_threshold}/kW")
+        try:
+            threshold_projects = retriever.get_all_projects_by_threshold(
+                threshold_field='security_per_kw',
+                threshold_value=security_threshold,
+                operator='$gte'
+            )
+            if threshold_projects:
+                logger.success(f"Found {len(threshold_projects)} projects meeting threshold")
+                # Format as a list to prepend to context
+                threshold_list = f"\n## ALL PROJECTS WITH SECURITY >= ${security_threshold}/kW (Complete list from database)\n"
+                threshold_list += f"Total: {len(threshold_projects)} projects\n\n"
+                for i, proj in enumerate(threshold_projects, 1):
+                    sec_val = proj.get('security_per_kw', 'N/A')
+                    sec_str = f"${sec_val:.2f}/kW" if isinstance(sec_val, (int, float)) else sec_val
+                    threshold_list += f"{i}. **{proj['project_name']}** ({proj['inr']}) - {sec_str}\n"
+                    threshold_list += f"   Developer: {proj['developer']} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n"
+                # Prepend threshold list to context
+                context = f"{threshold_list}\n{context}"
+                retrieval["context"] = context
+        except Exception as e:
+            logger.warning(f"Threshold query failed: {e}")
 
     # 8. Generate Response
     logger.step("Generating response...")

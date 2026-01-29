@@ -527,6 +527,34 @@ def execute_retrieval(
         context = retrieval["context"]
         logger.success("Using document retrieval with hard filtering")
 
+    # --- THRESHOLD QUERY ENHANCEMENT (Critical for Q2/Q19 >$100/kW queries) ---
+    # For threshold queries, get ALL projects meeting the threshold from ChromaDB
+    filters = extract_multi_filters_from_query(query)
+    security_threshold = filters.get('security_per_kw_min')
+    if security_threshold and hasattr(retriever, 'get_all_projects_by_threshold'):
+        logger.info(f"THRESHOLD QUERY: Getting all projects with security_per_kw >= ${security_threshold}/kW")
+        try:
+            threshold_projects = retriever.get_all_projects_by_threshold(
+                threshold_field='security_per_kw',
+                threshold_value=security_threshold,
+                operator='$gte'
+            )
+            if threshold_projects:
+                logger.success(f"Found {len(threshold_projects)} projects meeting threshold")
+                # Format as a list to prepend to context
+                threshold_list = f"\n## ALL PROJECTS WITH SECURITY >= ${security_threshold}/kW (Complete list from database)\n"
+                threshold_list += f"Total: {len(threshold_projects)} projects\n\n"
+                for i, proj in enumerate(threshold_projects, 1):
+                    sec_val = proj.get('security_per_kw', 'N/A')
+                    sec_str = f"${sec_val:.2f}/kW" if isinstance(sec_val, (int, float)) else sec_val
+                    threshold_list += f"{i}. **{proj['project_name']}** ({proj['inr']}) - {sec_str}\n"
+                    threshold_list += f"   Developer: {proj['developer']} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n"
+                # Prepend threshold list to context
+                context = f"{threshold_list}\n{context}"
+                retrieval["context"] = context
+        except Exception as e:
+            logger.warning(f"Threshold query failed: {e}")
+
     return context, docs, retrieval, missing_warning
 
 
