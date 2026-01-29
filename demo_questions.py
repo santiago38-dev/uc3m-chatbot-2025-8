@@ -425,8 +425,8 @@ def test_full_chain(question: str, mode: str = "flash", verbose: bool = False):
     from src.rag_advanced.chain import get_rag_chain
     from src.rag_advanced.utils import RAGMode
 
-    # Get retriever and chain
-    retriever = get_smart_retriever(k_docs=15)
+    # Get retriever and chain (uses config.K_DOCS_DEFAULT=20)
+    retriever = get_smart_retriever()
     rag_mode = RAGMode.FLASH if mode == "flash" else RAGMode.THINKING
     chain = get_rag_chain(retriever, mode=rag_mode, with_history=False)
 
