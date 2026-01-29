@@ -767,8 +767,8 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     extracted_filters = input_dict.get("extracted_filters", {})
     is_comparative = input_dict.get("is_comparative", False)
 
-    # Use k_total if provided, else fallback to reasonable default or unlimited
-    max_docs = k_total if k_total else 15
+    # Use k_total if provided, else fallback to config default
+    max_docs = k_total if k_total else config.K_DOCS_DEFAULT
 
     # Detect language
     lang = detect_language(question)

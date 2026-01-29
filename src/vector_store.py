@@ -347,7 +347,7 @@ def get_smart_retriever(
 
 
 def get_hybrid_retriever(
-    k_docs: int = 15,
+    k_docs: int = 20,  # Increased from 15 for better coverage (matches SmartRetriever default)
     chromadb_path: str = None,
     use_smart: bool = True,
     boost_factor: float = 0.8
