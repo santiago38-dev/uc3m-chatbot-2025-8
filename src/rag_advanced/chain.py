@@ -65,13 +65,25 @@ COMPARATIVE QUERIES (Q5 fix): When comparing two entities (e.g., RWE vs SAMSUNG)
 - Provide analysis based on available data, even if one entity has limited data
 - Do NOT excessively hedge - if you have data for one entity, present it confidently
 - Note data limitations factually, but still provide substantive comparison
-- Focus on what you CAN compare rather than what's missing
+- Be THOROUGH with technical details - include ALL of these categories when available:
+  * Security deposits (amounts, $/kW, return conditions)
+  * Reactive power requirements and specifications
+  * Data exchange protocols and SCADA requirements
+  * Switching procedures and notice periods (specific days/hours)
+  * Equipment specifications and replacement terms
+  * Metering and telemetry requirements
+- Use structured tables for side-by-side comparison
 
 ANOMALY/UNUSUAL CLAUSE QUERIES (Q21 fix): When identifying unusual clauses:
 - Be thorough and specific - list at least 5-8 distinct unusual provisions if found
 - Include specific clause names, section numbers, and implications
 - Explain WHY each clause is unusual compared to standard ERCOT agreements
 - Cover categories: liability, termination, force majeure, notice periods, assignment rights
+
+OUTPUT FORMATTING (Q20 fix):
+- NEVER list the same project multiple times - consolidate information about each project
+- When listing projects, use UNIQUE project names only
+- If multiple document chunks reference the same project, merge the information into one entry
 
 IMPORTANT: All statistics include sample sizes (n=). When n < 10, note the limited sample size.
 """
@@ -95,13 +107,25 @@ CONSULTAS COMPARATIVAS: Al comparar dos entidades (ej: RWE vs SAMSUNG):
 - Proporciona análisis basado en datos disponibles, incluso si una entidad tiene datos limitados
 - NO cubras excesivamente - si tienes datos de una entidad, preséntalos con confianza
 - Nota las limitaciones de datos de forma factual, pero proporciona comparación sustantiva
-- Enfócate en lo que PUEDES comparar en lugar de lo que falta
+- Sé EXHAUSTIVO con detalles técnicos - incluye TODAS estas categorías cuando estén disponibles:
+  * Depósitos de seguridad (montos, $/kW, condiciones de devolución)
+  * Requisitos y especificaciones de potencia reactiva
+  * Protocolos de intercambio de datos y requisitos SCADA
+  * Procedimientos de conmutación y períodos de notificación (días/horas específicos)
+  * Especificaciones de equipos y términos de reemplazo
+  * Requisitos de medición y telemetría
+- Usa tablas estructuradas para comparación lado a lado
 
 CONSULTAS DE ANOMALÍAS/CLÁUSULAS INUSUALES: Al identificar cláusulas inusuales:
 - Sé exhaustivo y específico - lista al menos 5-8 disposiciones inusuales distintas si se encuentran
 - Incluye nombres de cláusulas específicas, números de sección e implicaciones
 - Explica POR QUÉ cada cláusula es inusual comparada con acuerdos ERCOT estándar
 - Cubre categorías: responsabilidad, terminación, fuerza mayor, períodos de notificación, derechos de cesión
+
+FORMATO DE SALIDA:
+- NUNCA listes el mismo proyecto múltiples veces - consolida la información de cada proyecto
+- Al listar proyectos, usa nombres de proyectos ÚNICOS solamente
+- Si múltiples fragmentos de documentos referencian el mismo proyecto, fusiona la información en una entrada
 
 IMPORTANTE: Todas las estadísticas incluyen tamaños de muestra (n=). Cuando n < 10, nota el tamaño de muestra limitado.
 """
