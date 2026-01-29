@@ -394,21 +394,8 @@ def classify_question(question: str) -> QuestionType:
     return QuestionType.GENERAL
 
 
-def get_format_instructions_helper(question_type: QuestionType, lang: str) -> str:
-    # Wrapper around the imported one if logic needed, or just direct import
-    from .utils import RESPONSE_FORMAT_TEMPLATES
-    lang_key = "es" if lang == "spanish" else "en"
-    template = RESPONSE_FORMAT_TEMPLATES.get(question_type.value.upper(), RESPONSE_FORMAT_TEMPLATES["GENERAL"])
-    return template.get(lang_key, template["en"])
-
-# Note: get_format_instructions is now imported from utils if I moved templates there?
-# Wait, I put RESPONSE_FORMAT_TEMPLATES in prompts.py. So I need to import it.
-# I imported get_format_instructions from utils in the imports above... wait, I didn't put get_format_instructions IN utils.
-# I should have put it in utils or prompts.
-# Let's check prompts.py... Yes, RESPONSE_FORMAT_TEMPLATES is in prompts.py.
-# So I should define get_format_instructions HERE using the template from prompts.py.
-
 def get_format_instructions(question_type: QuestionType, lang: str) -> str:
+    """Get format instructions template for the given question type and language."""
     from .prompts import RESPONSE_FORMAT_TEMPLATES
     lang_key = "es" if lang == "spanish" else "en"
     template = RESPONSE_FORMAT_TEMPLATES.get(question_type.value.upper(), RESPONSE_FORMAT_TEMPLATES["GENERAL"])

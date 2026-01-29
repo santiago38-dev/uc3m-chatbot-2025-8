@@ -395,8 +395,8 @@ def create_comparative_filter_hook(
                     )
                     logger.warning(f"Missing entities in results: {missing}")
 
-        # Format sources
-        retrieval = format_sources(docs, max_sources=k_total)
+        # Format sources - use effective_k (guaranteed non-None) not k_total
+        retrieval = format_sources(docs, max_sources=effective_k)
 
         return docs, retrieval, missing_warning
 

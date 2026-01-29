@@ -32,8 +32,19 @@ def call_llm_api(prompt_text: str) -> Generator[str, None, None]:
         "temperature": 0.1       # Consensus: Low for factual RAG, not 0.0 (repetition risk)
     }
 
+    # Track if we've yielded anything (for error handling)
+    yielded_content = False
+
     try:
-        with requests.post(LLM_API_URL, headers=headers, json=payload, stream=True) as response:
+        # CRITICAL: Add timeout to prevent hanging forever on unresponsive server
+        # connect_timeout=10s, read_timeout=120s (streaming can take time)
+        with requests.post(
+            LLM_API_URL,
+            headers=headers,
+            json=payload,
+            stream=True,
+            timeout=(10, 120)  # (connect_timeout, read_timeout)
+        ) as response:
             response.raise_for_status()
 
             for line in response.iter_lines(decode_unicode=True):
@@ -41,13 +52,21 @@ def call_llm_api(prompt_text: str) -> Generator[str, None, None]:
                     try:
                         json_data = json.loads(line)
                         if 'response' in json_data:
+                            yielded_content = True
                             yield json_data['response']
                     except json.JSONDecodeError as e:
                         print(f"Warning: Could not decode line: {line}. Error: {e}")
 
+    except requests.exceptions.Timeout as e:
+        print(f"LLM API timeout: {e}")
+        # Only yield error if nothing was streamed yet (avoid garbled response)
+        if not yielded_content:
+            yield "I'm sorry, the request timed out. Please try again."
     except requests.exceptions.RequestException as e:
         print(f"Error calling LLM API: {e}")
-        yield "I'm sorry, I couldn't get a response from the LLM at this moment."
+        # Only yield error if nothing was streamed yet (avoid garbled response)
+        if not yielded_content:
+            yield "I'm sorry, I couldn't get a response from the LLM at this moment."
 
 
 def call_llm_api_full(prompt_text: str) -> str:
