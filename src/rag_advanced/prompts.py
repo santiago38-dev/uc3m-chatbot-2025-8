@@ -84,9 +84,18 @@ THRESHOLD VALIDATION (CRITICAL for questions with numeric criteria):
   2. ONLY include items that ACTUALLY meet the threshold criteria
   3. If a source shows $26.42/kW and the question asks for >$100/kW, DO NOT include that item
   4. Double-check your math: divide security_amount by capacity to get $/kW
+  5. When listing $/kW values, ALWAYS show the per-kW rate (e.g., "$140.29/kW"), NOT just total amounts
 - Example: Q: "Which projects have security >$100/kW?"
   - WRONG: Including Elio BESS at $26.42/kW (below threshold)
   - RIGHT: Only listing projects where security_per_kw > 100
+
+LOGICAL CONSISTENCY (CRITICAL - never contradict yourself):
+- NEVER say "there are no projects" or "no project meets criteria" and then LIST projects
+- If you find projects meeting the criteria, START with "There are X projects..." and list them
+- If you truly find NO projects meeting criteria, say so WITHOUT listing any projects
+- Before writing "no projects found", check: are you about to list projects? If yes, DELETE that statement
+- Example WRONG: "There is no project over $100/kW. However, Cascade Solar ($140/kW) and Raven ($144/kW)..."
+- Example RIGHT: "There are 2 projects over $100/kW: Cascade Solar ($140.29/kW) and Raven Storage ($144.40/kW)"
 
 DEDUPLICATION & CONCISENESS (CRITICAL):
 - Do NOT list the same project multiple times in your response - EVER
@@ -205,9 +214,18 @@ VALIDACIÓN DE UMBRALES (CRÍTICO para preguntas con criterios numéricos):
   2. SOLO incluye elementos que REALMENTE cumplan el criterio del umbral
   3. Si una fuente muestra $26.42/kW y la pregunta pide >$100/kW, NO incluyas ese elemento
   4. Verifica tu cálculo: divide monto_garantía entre capacidad para obtener $/kW
+  5. Al listar valores $/kW, SIEMPRE muestra la tasa por kW (ej: "$140.29/kW"), NO solo montos totales
 - Ejemplo: P: "¿Qué proyectos tienen garantía >$100/kW?"
   - MAL: Incluir Elio BESS a $26.42/kW (debajo del umbral)
   - BIEN: Solo listar proyectos donde security_per_kw > 100
+
+CONSISTENCIA LÓGICA (CRÍTICO - nunca te contradigas):
+- NUNCA digas "no hay proyectos" o "ningún proyecto cumple" y luego LISTES proyectos
+- Si encuentras proyectos que cumplen el criterio, COMIENZA con "Hay X proyectos..." y lístalos
+- Si realmente NO encuentras proyectos que cumplan, dilo SIN listar ningún proyecto
+- Antes de escribir "no se encontraron proyectos", pregúntate: ¿voy a listar proyectos? Si sí, ELIMINA esa frase
+- Ejemplo MAL: "No hay proyectos sobre $100/kW. Sin embargo, Cascade Solar ($140/kW) y Raven ($144/kW)..."
+- Ejemplo BIEN: "Hay 2 proyectos sobre $100/kW: Cascade Solar ($140.29/kW) y Raven Storage ($144.40/kW)"
 
 DEDUPLICACIÓN Y CONCISIÓN (CRÍTICO):
 - NO listes el mismo proyecto múltiples veces en tu respuesta - NUNCA
