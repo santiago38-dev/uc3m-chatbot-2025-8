@@ -15,7 +15,7 @@ import statistics
 import re
 from typing import List, Dict, Any
 
-from src.vector_store import get_retriever, get_document_content
+from src.vector_store import get_smart_retriever, get_document_content
 from src.rag_advanced.chain import get_rag_chain, OOS_QUESTION_MSG
 from src.rag_advanced.utils import RAGMode, detect_language
 from src.llm_client import call_llm_api_full
@@ -48,7 +48,8 @@ class RAGQualityEvaluator:
         self.k_docs = k_docs
         self.mode = mode
         self.with_summary = with_summary
-        self.retriever = get_retriever(k_docs=k_docs)
+        # Use SmartRetriever for hard filtering support (matches frontend.py)
+        self.retriever = get_smart_retriever(k_docs=k_docs)
         self.rag_chain = get_rag_chain(
             retriever=self.retriever,
             mode=mode,

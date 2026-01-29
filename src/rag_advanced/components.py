@@ -789,33 +789,36 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # 4. Query Expansion
     queries = expand_query(question)
 
-    # 5. Build hard filter for ANY extracted filters (not just comparative)
-    # This handles: numeric filters (security_per_kw_min), zone filters, etc.
+    # === CRITICAL: Detect project name comparisons ===
+    # BUG FIX: is_comparative from chain.py only checks regex patterns.
+    # We also need to check if LLM extracted multiple project names.
+    has_explicit_project_names = (
+        isinstance(metadata_filters.get('project_name'), list) and
+        len(metadata_filters.get('project_name', [])) >= 2
+    )
+
+    if has_explicit_project_names:
+        logger.info(f"Detected explicit project name comparison: {metadata_filters['project_name']}")
+        # Override is_comparative if we have explicit project names
+        is_comparative = True
+
+    # 5. Build hard filter
+    # CRITICAL FIX: When explicit project names are specified, use ONLY project_name filter.
+    # DO NOT combine with fuel_type/zone - that causes heterogeneous comparisons to fail
+    # (e.g., "Compare battery project to solar project" would filter out the solar one).
     where_clause = None
-    if extracted_filters:
+
+    if has_explicit_project_names:
+        # PRIORITY: Project names take precedence over other filters
+        # This ensures "Compare Headcamp (battery) to Millers Branch (solar)" works
+        project_names = metadata_filters['project_name']
+        where_clause = {'project_name': {'$in': project_names}}
+        logger.info(f"Using project_name-ONLY filter (ignoring fuel_type to support heterogeneous comparisons): {where_clause}")
+    elif extracted_filters:
+        # No explicit project names - use standard regex-based filters
         where_clause = build_chromadb_where_clause(extracted_filters, expand_aliases=True)
         if where_clause:
             logger.info(f"Built ChromaDB where clause: {where_clause}")
-
-    # === CRITICAL FIX: Use LLM-extracted project_name for hard filtering ===
-    # When explicit project names are mentioned (e.g., "Compare Headcamp to Quantum"),
-    # we MUST filter to only those projects to prevent noise document pollution.
-    if metadata_filters.get('project_name') and is_comparative:
-        project_names = metadata_filters['project_name']
-        if isinstance(project_names, list) and len(project_names) >= 2:
-            # Build project_name filter using regex pattern matching
-            # ChromaDB doesn't support LIKE, so we use $in with extracted names
-            project_filter = {'project_name': {'$in': project_names}}
-            logger.info(f"Adding project_name hard filter: {project_filter}")
-
-            if where_clause:
-                # Merge with existing where clause using $and
-                if '$and' in where_clause:
-                    where_clause['$and'].append(project_filter)
-                else:
-                    where_clause = {'$and': [where_clause, project_filter]}
-            else:
-                where_clause = project_filter
 
     # 6. Multi-Query Retrieval
     # Strategy: Split K total budget across N queries
@@ -825,11 +828,23 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
 
     # Use hard filtering if we have a where clause and retriever supports it
+    all_docs = []
+    used_hard_filter = False
+
     if where_clause and hasattr(retriever, 'search_with_hard_filters'):
         logger.info("Using HARD filtering mode")
-        # For hard filtering, we retrieve with the filter applied
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
-    else:
+        used_hard_filter = True
+
+        # === CRITICAL FALLBACK: If hard filter returns empty, try semantic search ===
+        # This handles cases where LLM extracted slightly wrong project names
+        if not all_docs and has_explicit_project_names:
+            logger.warning(f"Hard filter returned 0 results - falling back to semantic search")
+            logger.warning(f"Possible exact match failure for: {metadata_filters['project_name']}")
+            all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
+            used_hard_filter = False
+
+    if not all_docs:
         # Standard multi-retrieve with boosting
         all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
 
