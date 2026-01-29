@@ -202,7 +202,7 @@ class SmartRetriever:
     def __init__(
         self,
         vectorstore,
-        k: int = 15,
+        k: int = 20,  # Increased from 15 for better coverage
         boost_factor: float = 0.8,
         k_initial: int = 50
     ):
@@ -317,7 +317,7 @@ class SmartRetriever:
 
 
 def get_smart_retriever(
-    k_docs: int = 15,
+    k_docs: int = 20,  # Increased from 15 for better coverage
     chromadb_path: str = None,
     boost_factor: float = 0.8,
     k_initial: int = 50

@@ -330,12 +330,17 @@ def create_comparative_filter_hook(
         filters = extract_multi_filters_from_query(query)
         where_clause = build_chromadb_where_clause(filters, expand_aliases=True)
 
-        # Determine if this is a comparative query
+        # Determine if this is a comparative query that should use hard filtering
+        # NOTE: Only hard filter on parent_company and tsp_normalized, NOT fuel_type
+        # fuel_type has too many null values in the corpus, causing "No documents found" errors
+        # Also trigger hard filtering for specific INR lookups (single project queries)
         is_comparative = (
             isinstance(filters.get('parent_company'), list) or
-            isinstance(filters.get('tsp_normalized'), list) or
-            isinstance(filters.get('fuel_type'), list)
+            isinstance(filters.get('tsp_normalized'), list)
         )
+
+        # Special case: Single INR lookup should also use hard filtering for precision
+        has_specific_inr = isinstance(filters.get('inr'), str) and filters.get('inr')
 
         # Log filter info
         if filters:
@@ -343,13 +348,28 @@ def create_comparative_filter_hook(
             if where_clause:
                 logger.info(f"ChromaDB where clause: {where_clause}")
 
-        # Retrieve with hard filtering ONLY for comparative queries
-        # Don't apply hard filters for simple lookups where fuel_type words appear in project names
-        if is_comparative and where_clause and hasattr(retriever, 'search_with_hard_filters'):
-            logger.info("Using HARD filtering mode for comparative query")
+        # Retrieve with hard filtering for:
+        # 1. Comparative queries (RWE vs SAMSUNG, ONCOR vs Centerpoint)
+        # 2. Specific INR lookups (25INR0138)
+        # NOTE: Don't hard filter on fuel_type alone - too many null values cause empty results
+        should_hard_filter = (is_comparative or has_specific_inr) and where_clause and hasattr(retriever, 'search_with_hard_filters')
+
+        # Build a filtered where clause that excludes fuel_type from hard filtering
+        # to prevent "No documents found" for battery vs solar comparisons
+        hard_filter_clause = None
+        if should_hard_filter:
+            # Create a where clause with only the safe fields (parent_company, tsp_normalized, inr)
+            safe_filters = {k: v for k, v in filters.items()
+                          if k in ('parent_company', 'tsp_normalized', 'inr')}
+            if safe_filters:
+                hard_filter_clause = build_chromadb_where_clause(safe_filters, expand_aliases=True)
+
+        if hard_filter_clause and hasattr(retriever, 'search_with_hard_filters'):
+            filter_type = "INR lookup" if has_specific_inr else "comparative query"
+            logger.info(f"Using HARD filtering mode for {filter_type}")
             docs = retriever.search_with_hard_filters(
                 query,
-                where=where_clause,
+                where=hard_filter_clause,
                 k=k_total
             )
         else:
@@ -361,7 +381,8 @@ def create_comparative_filter_hook(
         if len(docs) < original_count:
             logger.info(f"Deduplicated: {original_count} -> {len(docs)} documents")
 
-        # Check for missing entities
+        # Check for missing entities (only for parent_company and tsp_normalized comparisons)
+        # NOTE: Skip missing entity warnings for fuel_type - those comparisons work differently
         missing_warning = None
         if is_comparative:
             requested_entities = []
@@ -373,6 +394,8 @@ def create_comparative_filter_hook(
             elif isinstance(filters.get('tsp_normalized'), list):
                 requested_entities = filters['tsp_normalized']
                 entity_type = 'tsp_normalized'
+            # NOTE: Do NOT check missing entities for fuel_type comparisons (battery vs solar)
+            # Those queries use semantic search and fuel_type metadata may be missing
 
             if requested_entities:
                 # Use entity-type-aware functions for proper TSP vs parent company detection
@@ -630,10 +653,11 @@ def get_thinking_chain(
 
             # --- STEP 3: Extract filters for thinking mode ---
             filters = extract_multi_filters_from_query(question)
+            # NOTE: Only hard filter on parent_company and tsp_normalized, NOT fuel_type
+            # fuel_type has too many null values causing empty results for "battery vs solar"
             is_comparative = (
                 isinstance(filters.get('parent_company'), list) or
-                isinstance(filters.get('tsp_normalized'), list) or
-                isinstance(filters.get('fuel_type'), list)
+                isinstance(filters.get('tsp_normalized'), list)
             )
 
             if filters:

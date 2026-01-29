@@ -220,13 +220,14 @@ def get_unique_projects_from_docs(docs: List[Document]) -> Dict[str, Dict[str, A
 
 # --- Domain Filter ---
 
-def is_domain_relevant(question: str, chat_history: list = None, threshold: float = 0.50) -> bool:
+def is_domain_relevant(question: str, chat_history: list = None, threshold: float = 0.40) -> bool:
     """Check if question is about ERCOT/energy domain using confidence score.
 
     Args:
         question: The user's question
         chat_history: Optional chat history for context (follow-up questions)
-        threshold: Minimum confidence score to consider relevant (default: 50%)
+        threshold: Minimum confidence score to consider relevant (default: 40%)
+                  Lowered from 50% to allow legal/contractual questions like force majeure
     """
     logger = get_logger()
     logger.step("Checking if question is in ERCOT domain...")
@@ -789,13 +790,20 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # 4. Query Expansion
     queries = expand_query(question)
 
-    # 5. Build hard filter for ANY extracted filters (not just comparative)
-    # This handles: numeric filters (security_per_kw_min), zone filters, etc.
+    # 5. Build hard filter for comparative and INR queries
+    # NOTE: Only hard filter on parent_company, tsp_normalized, and inr
+    # fuel_type has too many null values in the corpus, causing empty results
     where_clause = None
+    has_specific_inr = isinstance(extracted_filters.get('inr'), str) and extracted_filters.get('inr')
+
     if extracted_filters:
-        where_clause = build_chromadb_where_clause(extracted_filters, expand_aliases=True)
-        if where_clause:
-            logger.info(f"Built ChromaDB where clause: {where_clause}")
+        # Build safe where clause excluding fuel_type from hard filtering
+        safe_filters = {k: v for k, v in extracted_filters.items()
+                       if k in ('parent_company', 'tsp_normalized', 'inr')}
+        if safe_filters:
+            where_clause = build_chromadb_where_clause(safe_filters, expand_aliases=True)
+            if where_clause:
+                logger.info(f"Built ChromaDB where clause (safe fields only): {where_clause}")
 
     # 6. Multi-Query Retrieval
     # Strategy: Split K total budget across N queries
@@ -804,9 +812,13 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
 
-    # Use hard filtering if we have a where clause and retriever supports it
-    if where_clause and hasattr(retriever, 'search_with_hard_filters'):
-        logger.info("Using HARD filtering mode")
+    # Use hard filtering for comparative queries (parent_company/tsp comparisons) or INR lookups
+    # NOTE: is_comparative is set in chain.py for parent_company and tsp_normalized comparisons
+    should_hard_filter = (is_comparative or has_specific_inr) and where_clause and hasattr(retriever, 'search_with_hard_filters')
+
+    if should_hard_filter:
+        filter_type = "INR lookup" if has_specific_inr else "comparative query"
+        logger.info(f"Using HARD filtering mode for {filter_type}")
         # For hard filtering, we retrieve with the filter applied
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
     else:
@@ -833,6 +845,8 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     # === CHECK FOR MISSING ENTITIES ===
     # Fixed: Use entity_type to correctly detect TSPs vs developers (fixes Q3 ONCOR warning bug)
+    # NOTE: Only check for parent_company and tsp_normalized - NOT for fuel_type comparisons
+    # fuel_type comparisons (battery vs solar) work via semantic search, not metadata matching
     missing_warning = None
     if is_comparative:
         requested_entities = []
@@ -844,6 +858,8 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         elif isinstance(extracted_filters.get('tsp_normalized'), list):
             requested_entities = extracted_filters['tsp_normalized']
             entity_type = 'tsp_normalized'
+        # NOTE: Do NOT check missing entities for fuel_type comparisons
+        # Those queries work via semantic search and metadata may be incomplete
 
         if requested_entities:
             # Use entity-type-aware function for proper TSP vs developer detection

@@ -64,12 +64,19 @@ MULTI-DOCUMENT ANALYSIS:
 - Identify patterns across multiple SGIAs when answering trend questions
 
 RULES:
-- If context doesn't contain the answer, say: "I don't have information about that in the available documents."
+- **THOROUGHLY READ** each source document before claiming data is "not specified"
+- Only say "I don't have information" if you've checked ALL provided sources and the data truly isn't there
 - Cite sources using [Source N] format for EACH claim
 - When data varies across sources, report the range and cite all relevant sources
 - Do NOT include meta-commentary about what I removed or changed
 - Do NOT hallucinate specific numbers, dates, or names not in the context
 - NEVER attribute a project to a developer unless the source metadata explicitly confirms it
+
+DATA EXTRACTION - BE THOROUGH:
+- Read the FULL content of each [Source N] block, not just the headers
+- Look for data in tables, lists, and paragraph text
+- Project details like Developer, Location, Capacity, and Security are often in the document body, not just headers
+- If the question asks about specific fields, search for those exact terms in the source text
 
 DEDUPLICATION & CONCISENESS:
 - Do NOT list the same project multiple times in your response
@@ -166,12 +173,19 @@ ANÁLISIS MULTI-DOCUMENTO:
 - Identifica patrones entre múltiples SGIAs al responder preguntas de tendencias
 
 REGLAS:
-- Si el contexto no contiene la respuesta, di: "No tengo información sobre eso en los documentos disponibles."
+- **LEE COMPLETAMENTE** cada documento fuente antes de afirmar que los datos "no están especificados"
+- Solo di "No tengo información" si has revisado TODAS las fuentes proporcionadas y los datos realmente no están ahí
 - Cita fuentes usando [Fuente N] para CADA afirmación
 - Cuando los datos varíen entre fuentes, reporta el rango y cita todas las fuentes
 - NO incluyas meta-comentarios sobre lo que eliminaste o cambiaste
 - NO inventes números, fechas o nombres específicos que no estén en el contexto
 - NUNCA atribuyas un proyecto a un desarrollador a menos que los metadatos de la fuente lo confirmen explícitamente
+
+EXTRACCIÓN DE DATOS - SÉ MINUCIOSO:
+- Lee el contenido COMPLETO de cada bloque [Fuente N], no solo los encabezados
+- Busca datos en tablas, listas y texto de párrafos
+- Detalles del proyecto como Desarrollador, Ubicación, Capacidad y Garantía a menudo están en el cuerpo del documento, no solo en encabezados
+- Si la pregunta pide campos específicos, busca esos términos exactos en el texto fuente
 
 DEDUPLICACIÓN Y CONCISIÓN:
 - NO listes el mismo proyecto múltiples veces en tu respuesta
@@ -209,6 +223,8 @@ TOPICS THAT ARE ALWAYS IN-SCOPE:
 - Solar (SOL), wind (WIN), battery (BESS/OTH), gas projects
 - Texas energy developers, TSPs, project costs
 - INR numbers, security deposits, milestones
+- **Legal/contractual terms**: force majeure, termination rights, liability limitations, indemnification, cure periods, default provisions - these are ALL part of SGIA agreements
+- **TSP comparisons**: ONCOR vs Centerpoint requirements, AEP terms, etc.
 - **Language changes (e.g. asking in Spanish after English)**: The domain is the content, NOT the language. If the question is about ERCOT in any language, it is RELEVANT.
 
 {chat_context}Question to evaluate: {question}
