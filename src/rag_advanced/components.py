@@ -1048,13 +1048,16 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     security_threshold = metadata_filters.get('security_per_kw_min')
     print(f">>> DEBUG Threshold: security_threshold={security_threshold}, retriever_type={type(retriever).__name__}, has_method={hasattr(retriever, 'get_all_projects_by_threshold')}")
     if security_threshold and hasattr(retriever, 'get_all_projects_by_threshold'):
-        logger.info(f"THRESHOLD QUERY: Getting all projects with security_per_kw >= ${security_threshold}/kW")
+        print(f">>> Calling get_all_projects_by_threshold...")
         try:
             threshold_projects = retriever.get_all_projects_by_threshold(
                 threshold_field='security_per_kw',
                 threshold_value=security_threshold,
                 operator='$gte'
             )
+            print(f">>> Found {len(threshold_projects)} projects from ChromaDB:")
+            for p in threshold_projects[:8]:
+                print(f">>>   {p['project_name']} ({p['inr']}): ${p.get('security_per_kw', 'N/A')}/kW")
             if threshold_projects:
                 logger.success(f"Found {len(threshold_projects)} projects meeting threshold")
                 # Format as a list to prepend to context
