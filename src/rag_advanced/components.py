@@ -865,6 +865,14 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # 3. Metadata Extraction (LLM-based, complements regex-based filters)
     metadata_filters = extract_query_metadata(question)
 
+    # 3b. Also run regex-based extraction for threshold queries (more reliable for Q2/Q19)
+    from .filter_utils import extract_multi_filters_from_query
+    regex_filters = extract_multi_filters_from_query(question)
+    # Merge threshold from regex extraction (more reliable than LLM for numeric thresholds)
+    if regex_filters.get('security_per_kw_min') and not metadata_filters.get('security_per_kw_min'):
+        metadata_filters['security_per_kw_min'] = regex_filters['security_per_kw_min']
+        logger.info(f"Using regex-extracted threshold: ${regex_filters['security_per_kw_min']}/kW")
+
     # 4. Query Expansion
     queries = expand_query(question)
 
@@ -876,13 +884,21 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     has_specific_zone = isinstance(extracted_filters.get('zone'), str) and extracted_filters.get('zone')
 
     # Check for project_name from LLM extraction (Q17: "What is the security deposit for Quantum Storage?")
+    # BUT: Don't hard filter on project_name for comparative queries (Q13: "Compare Headcamp to Quantum")
+    # because we need documents from BOTH projects, not just one
     has_specific_project = isinstance(metadata_filters.get('project_name'), str) and metadata_filters.get('project_name')
 
+    # Detect if this is a project comparison query (mentions "compare", "vs", "versus" with project names)
+    is_project_comparison = bool(re.search(r'\b(compare|vs\.?|versus)\b', question.lower()))
+
     # Merge project_name from LLM extraction into extracted_filters for hard filtering
+    # ONLY for single-project lookups, NOT for project comparisons
     combined_filters = dict(extracted_filters) if extracted_filters else {}
-    if has_specific_project:
+    if has_specific_project and not is_project_comparison:
         combined_filters['project_name'] = metadata_filters['project_name']
         logger.info(f"LLM extracted project_name for hard filter: {metadata_filters['project_name']}")
+    elif has_specific_project and is_project_comparison:
+        logger.info(f"Skipping project_name hard filter for comparison query (need docs from multiple projects)")
 
     if combined_filters:
         # Build safe where clause excluding fuel_type from hard filtering
@@ -903,12 +919,14 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     # Use hard filtering for comparative queries, INR lookups, zone-specific, or project-specific queries
     # NOTE: is_comparative is set in chain.py for parent_company and tsp_normalized comparisons
-    should_hard_filter = (is_comparative or has_specific_inr or has_specific_zone or has_specific_project) and where_clause and hasattr(retriever, 'search_with_hard_filters')
+    # NOTE: Don't hard filter on project_name alone for project comparison queries (Q13)
+    use_project_filter = has_specific_project and not is_project_comparison
+    should_hard_filter = (is_comparative or has_specific_inr or has_specific_zone or use_project_filter) and where_clause and hasattr(retriever, 'search_with_hard_filters')
 
     if should_hard_filter:
         if has_specific_inr:
             filter_type = "INR lookup"
-        elif has_specific_project:
+        elif use_project_filter:
             filter_type = "project name lookup"
         elif has_specific_zone:
             filter_type = "zone filter"
@@ -930,7 +948,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     # === DEDUPLICATION ===
     original_count = len(all_docs)
-    all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=5)
+    all_docs = deduplicate_docs_by_inr(all_docs, max_chunks_per_project=3)  # Reduced from 5 to prevent LLM duplication (Q20)
     if len(all_docs) < original_count:
         logger.info(f"Deduplicated: {original_count} -> {len(all_docs)} documents")
 

@@ -310,7 +310,7 @@ def get_context_for_query(
 
 def create_comparative_filter_hook(
     k_total: int = None,
-    max_chunks_per_project: int = 5
+    max_chunks_per_project: int = 3  # Reduced from 5 to prevent LLM listing same project multiple times (Q20)
 ) -> Callable:
     """
     Create a filter hook that implements:
