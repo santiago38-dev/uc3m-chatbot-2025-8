@@ -202,9 +202,9 @@ class SmartRetriever:
     def __init__(
         self,
         vectorstore,
-        k: int = 15,
+        k: int = 25,  # Match config.K_DOCS_DEFAULT for consistency
         boost_factor: float = 0.8,
-        k_initial: int = 50
+        k_initial: int = 75  # Increased to support higher k
     ):
         self.vectorstore = vectorstore
         self.k = k

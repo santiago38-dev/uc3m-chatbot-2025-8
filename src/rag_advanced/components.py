@@ -658,12 +658,17 @@ def multi_retrieve(queries: List[str], retriever, filters: Dict[str, Any] = None
         futures = [executor.submit(retrieve_single, q) for q in queries]
 
         for future in as_completed(futures):
-            docs = future.result()
-            for doc in docs:
-                content_hash = hash(doc.page_content[:200])
-                if content_hash not in seen_contents:
-                    seen_contents.add(content_hash)
-                    all_docs.append(doc)
+            try:
+                docs = future.result()
+                for doc in docs:
+                    content_hash = hash(doc.page_content[:200])
+                    if content_hash not in seen_contents:
+                        seen_contents.add(content_hash)
+                        all_docs.append(doc)
+            except Exception as e:
+                # Don't let one failed query crash the whole pipeline
+                logger.warning(f"Query retrieval failed: {e}")
+                continue
 
     logger.success(f"Retrieved {len(all_docs)} unique documents")
     return all_docs
@@ -900,10 +905,11 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         # When user asks "Compare Headcamp to Quantum", check if both projects are found
         if has_explicit_project_names and not missing_warning:
             requested_projects = metadata_filters.get('project_name', [])
-            found_projects = set(doc.metadata.get('project_name', '').upper() for doc in all_docs)
+            # Handle None values to prevent AttributeError on .upper()
+            found_projects = set((doc.metadata.get('project_name') or '').upper() for doc in all_docs)
             missing_projects = [p for p in requested_projects if p.upper() not in found_projects]
             if missing_projects:
-                found_list = list(set(doc.metadata.get('project_name', '') for doc in all_docs if doc.metadata.get('project_name')))
+                found_list = list(set(doc.metadata.get('project_name') or '' for doc in all_docs if doc.metadata.get('project_name')))
                 if lang == 'spanish':
                     missing_warning = f"⚠️ **Advertencia:** No se encontraron documentos para: {', '.join(missing_projects)}. Proyectos encontrados: {', '.join(found_list[:5])}."
                 else:

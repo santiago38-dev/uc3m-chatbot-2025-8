@@ -85,14 +85,19 @@ METADATA_EXTRACTION_PROMPT = """Extract specific metadata entities from this use
 Return a JSON object with any of the following fields IF they are explicitly mentioned or clearly inferred.
 
 FIELDS TO EXTRACT:
-- project_name: Specific project names (e.g. "Willow Beach Wind", "Stoneridge", "Blue Summit")
-- inr: Interconnection Request numbers (e.g. "25INR0494", "22INR0111")
+- project_name: Specific project names. IMPORTANT: If MULTIPLE projects are mentioned (e.g., "Compare Headcamp to Quantum Storage"), return as JSON ARRAY: ["Headcamp", "Quantum Storage"]
+- inr: Interconnection Request numbers (e.g. "25INR0494", "22INR0111"). Multiple = array.
 - developer_spv: Developer SPV names (e.g. "ACE DevCo", "Capital Wind")
-- parent_company: Parent companies (e.g. "NextEra", "CenterPoint", "RWE")
+- parent_company: Parent companies (e.g. "NextEra", "CenterPoint", "RWE"). Multiple = array.
 - county: Texas counties (e.g. "Brazoria", "Harris")
 - zone: ERCOT Zones (NORTH, SOUTH, WEST, COAST, PANHANDLE)
 - technology: 'WT' (Wind), 'PV' (Solar), 'BA' (Battery/Storage), 'GAS' (Gas)
 - fuel_type: 'WIN' (Wind), 'SOL' (Solar), 'OTH' (Storage), 'GAS' (Gas)
+
+CRITICAL FOR COMPARISONS:
+- If query compares entities (e.g., "Compare X to Y", "X vs Y", "X and Y comparison"), return those entities as arrays
+- Example: "Compare Headcamp to Quantum Storage" → {{"project_name": ["Headcamp", "Quantum Storage"]}}
+- Example: "RWE vs SAMSUNG projects" → {{"parent_company": ["RWE", "SAMSUNG"]}}
 
 GUIDELINES:
 - If a project name is mentioned (e.g. "Willow Beach"), extract it as 'project_name'.
