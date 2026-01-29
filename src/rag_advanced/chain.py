@@ -357,15 +357,24 @@ def create_comparative_filter_hook(
         # Build a filtered where clause that excludes fuel_type from hard filtering
         # to prevent "No documents found" for battery vs solar comparisons
         hard_filter_clause = None
+
+        # Check for zone-specific queries (Q6: "List all battery projects in West Texas zone")
+        has_specific_zone = isinstance(filters.get('zone'), str) and filters.get('zone')
+
+        # Also trigger hard filtering for zone-specific queries
+        if has_specific_zone and not should_hard_filter:
+            should_hard_filter = hasattr(retriever, 'search_with_hard_filters')
+
         if should_hard_filter:
-            # Create a where clause with only the safe fields (parent_company, tsp_normalized, inr)
+            # Create a where clause with safe fields (parent_company, tsp_normalized, inr, zone)
+            # NOTE: zone is safe because it has good coverage in metadata
             safe_filters = {k: v for k, v in filters.items()
-                          if k in ('parent_company', 'tsp_normalized', 'inr')}
+                          if k in ('parent_company', 'tsp_normalized', 'inr', 'zone')}
             if safe_filters:
                 hard_filter_clause = build_chromadb_where_clause(safe_filters, expand_aliases=True)
 
         if hard_filter_clause and hasattr(retriever, 'search_with_hard_filters'):
-            filter_type = "INR lookup" if has_specific_inr else "comparative query"
+            filter_type = "INR lookup" if has_specific_inr else ("zone filter" if has_specific_zone else "comparative query")
             logger.info(f"Using HARD filtering mode for {filter_type}")
             docs = retriever.search_with_hard_filters(
                 query,

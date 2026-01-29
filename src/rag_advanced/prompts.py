@@ -78,8 +78,20 @@ DATA EXTRACTION - BE THOROUGH:
 - Project details like Developer, Location, Capacity, and Security are often in the document body, not just headers
 - If the question asks about specific fields, search for those exact terms in the source text
 
-DEDUPLICATION & CONCISENESS:
-- Do NOT list the same project multiple times in your response
+THRESHOLD VALIDATION (CRITICAL for questions with numeric criteria):
+- When the question asks for items above/below a threshold (e.g., ">$100/kW", "over 200 MW"):
+  1. VERIFY each item's value BEFORE including it in your response
+  2. ONLY include items that ACTUALLY meet the threshold criteria
+  3. If a source shows $26.42/kW and the question asks for >$100/kW, DO NOT include that item
+  4. Double-check your math: divide security_amount by capacity to get $/kW
+- Example: Q: "Which projects have security >$100/kW?"
+  - WRONG: Including Elio BESS at $26.42/kW (below threshold)
+  - RIGHT: Only listing projects where security_per_kw > 100
+
+DEDUPLICATION & CONCISENESS (CRITICAL):
+- Do NOT list the same project multiple times in your response - EVER
+- Before listing a project, check if you've already listed it (same name or same INR)
+- If you see the same project in multiple source chunks, consolidate into ONE entry
 - For pattern/policy questions (e.g., "What are typical cure periods?"), synthesize the answer WITHOUT listing every source project individually
 - Only list individual projects when the question SPECIFICALLY asks for a list (e.g., "List all battery projects")
 - When answering about standard terms, clauses, or policies: state the pattern/policy first, then cite representative sources (e.g., "The typical cure period is 30 days [Source 1, 5, 8]")
@@ -187,8 +199,20 @@ EXTRACCIÓN DE DATOS - SÉ MINUCIOSO:
 - Detalles del proyecto como Desarrollador, Ubicación, Capacidad y Garantía a menudo están en el cuerpo del documento, no solo en encabezados
 - Si la pregunta pide campos específicos, busca esos términos exactos en el texto fuente
 
-DEDUPLICACIÓN Y CONCISIÓN:
-- NO listes el mismo proyecto múltiples veces en tu respuesta
+VALIDACIÓN DE UMBRALES (CRÍTICO para preguntas con criterios numéricos):
+- Cuando la pregunta pida elementos por encima/debajo de un umbral (ej: ">$100/kW", "más de 200 MW"):
+  1. VERIFICA el valor de cada elemento ANTES de incluirlo en tu respuesta
+  2. SOLO incluye elementos que REALMENTE cumplan el criterio del umbral
+  3. Si una fuente muestra $26.42/kW y la pregunta pide >$100/kW, NO incluyas ese elemento
+  4. Verifica tu cálculo: divide monto_garantía entre capacidad para obtener $/kW
+- Ejemplo: P: "¿Qué proyectos tienen garantía >$100/kW?"
+  - MAL: Incluir Elio BESS a $26.42/kW (debajo del umbral)
+  - BIEN: Solo listar proyectos donde security_per_kw > 100
+
+DEDUPLICACIÓN Y CONCISIÓN (CRÍTICO):
+- NO listes el mismo proyecto múltiples veces en tu respuesta - NUNCA
+- Antes de listar un proyecto, verifica si ya lo listaste (mismo nombre o mismo INR)
+- Si ves el mismo proyecto en múltiples fragmentos fuente, consolida en UNA entrada
 - Para preguntas sobre patrones/políticas (ej: "¿Cuáles son los períodos de cura típicos?"), sintetiza la respuesta SIN listar cada proyecto fuente individualmente
 - Solo lista proyectos individuales cuando la pregunta ESPECÍFICAMENTE pida una lista (ej: "Lista todos los proyectos de baterías")
 - Al responder sobre términos, cláusulas o políticas estándar: indica el patrón/política primero, luego cita fuentes representativas (ej: "El período de cura típico es 30 días [Fuente 1, 5, 8]")

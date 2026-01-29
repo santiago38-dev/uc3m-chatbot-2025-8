@@ -790,16 +790,27 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # 4. Query Expansion
     queries = expand_query(question)
 
-    # 5. Build hard filter for comparative and INR queries
-    # NOTE: Only hard filter on parent_company, tsp_normalized, and inr
+    # 5. Build hard filter for comparative, INR, zone, and project_name queries
+    # NOTE: Only hard filter on parent_company, tsp_normalized, inr, zone, project_name
     # fuel_type has too many null values in the corpus, causing empty results
     where_clause = None
     has_specific_inr = isinstance(extracted_filters.get('inr'), str) and extracted_filters.get('inr')
+    has_specific_zone = isinstance(extracted_filters.get('zone'), str) and extracted_filters.get('zone')
 
-    if extracted_filters:
+    # Check for project_name from LLM extraction (Q17: "What is the security deposit for Quantum Storage?")
+    has_specific_project = isinstance(metadata_filters.get('project_name'), str) and metadata_filters.get('project_name')
+
+    # Merge project_name from LLM extraction into extracted_filters for hard filtering
+    combined_filters = dict(extracted_filters) if extracted_filters else {}
+    if has_specific_project:
+        combined_filters['project_name'] = metadata_filters['project_name']
+        logger.info(f"LLM extracted project_name for hard filter: {metadata_filters['project_name']}")
+
+    if combined_filters:
         # Build safe where clause excluding fuel_type from hard filtering
-        safe_filters = {k: v for k, v in extracted_filters.items()
-                       if k in ('parent_company', 'tsp_normalized', 'inr')}
+        # NOTE: zone and project_name are safe because they have good coverage in metadata
+        safe_filters = {k: v for k, v in combined_filters.items()
+                       if k in ('parent_company', 'tsp_normalized', 'inr', 'zone', 'project_name')}
         if safe_filters:
             where_clause = build_chromadb_where_clause(safe_filters, expand_aliases=True)
             if where_clause:
@@ -812,12 +823,19 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
 
-    # Use hard filtering for comparative queries (parent_company/tsp comparisons) or INR lookups
+    # Use hard filtering for comparative queries, INR lookups, zone-specific, or project-specific queries
     # NOTE: is_comparative is set in chain.py for parent_company and tsp_normalized comparisons
-    should_hard_filter = (is_comparative or has_specific_inr) and where_clause and hasattr(retriever, 'search_with_hard_filters')
+    should_hard_filter = (is_comparative or has_specific_inr or has_specific_zone or has_specific_project) and where_clause and hasattr(retriever, 'search_with_hard_filters')
 
     if should_hard_filter:
-        filter_type = "INR lookup" if has_specific_inr else "comparative query"
+        if has_specific_inr:
+            filter_type = "INR lookup"
+        elif has_specific_project:
+            filter_type = "project name lookup"
+        elif has_specific_zone:
+            filter_type = "zone filter"
+        else:
+            filter_type = "comparative query"
         logger.info(f"Using HARD filtering mode for {filter_type}")
         # For hard filtering, we retrieve with the filter applied
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
