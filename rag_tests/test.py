@@ -98,12 +98,24 @@ QUESTION TYPE COVERAGE:
 
 if __name__ == "__main__":
     mode_str = sys.argv[1] if len(sys.argv) > 1 else "flash"
-    mode = RAGMode.FLASH if mode_str.lower() == "flash" else RAGMode.THINKING
 
     print("Validating SAMPLE_DATASET...")
     validate_dataset(SAMPLE_DATASET)
     print_coverage_stats(SAMPLE_DATASET)
 
-    results = run_evaluation(SAMPLE_DATASET, mode=mode)
+    if mode_str.lower() == "both":
+        print("\n" + "="*60)
+        print("RUNNING FLASH MODE")
+        print("="*60)
+        results_flash = run_evaluation(SAMPLE_DATASET, mode=RAGMode.FLASH)
 
-    print("\nEvaluation complete!")
+        print("\n" + "="*60)
+        print("RUNNING THINKING MODE")
+        print("="*60)
+        results_thinking = run_evaluation(SAMPLE_DATASET, mode=RAGMode.THINKING)
+
+        print("\nBoth evaluations complete!")
+    else:
+        mode = RAGMode.FLASH if mode_str.lower() == "flash" else RAGMode.THINKING
+        results = run_evaluation(SAMPLE_DATASET, mode=mode)
+        print("\nEvaluation complete!")
