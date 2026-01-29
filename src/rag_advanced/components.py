@@ -785,18 +785,20 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     analytics_context = ""
     if query_type in ("aggregation", "hybrid"):
         try:
-            import json
             from pathlib import Path
             analytics_file = Path(analytics_path)
             if analytics_file.exists():
                 with open(analytics_file, "r", encoding="utf-8") as f:
-                    analytics = json.load(f)
-                # Import formatting function
+                    analytics = json.load(f)  # json already imported at module level
+                # Import formatting function (inside function to avoid circular import)
                 from .chain import get_analytics_context
                 analytics_context = get_analytics_context(analytics)
                 logger.success(f"Loaded analytics context for {query_type} query")
         except Exception as e:
             logger.warning(f"Failed to load analytics: {e}")
+
+    # Track if we fell back to semantic search (affects entity warnings)
+    used_fallback = False
 
     # For pure aggregation queries, skip retrieval entirely
     if query_type == "aggregation" and analytics_context:
@@ -831,6 +833,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         should_hard_filter = (is_comparative or has_specific_inr) and where_clause and hasattr(retriever, 'search_with_hard_filters')
 
         all_docs = []
+
         if should_hard_filter:
             filter_type = "INR lookup" if has_specific_inr else "comparative query"
             logger.info(f"Using HARD filtering mode for {filter_type}")
@@ -841,6 +844,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
             if not all_docs:
                 logger.warning(f"Hard filter returned empty results, falling back to semantic search")
                 all_docs = retriever.invoke(question)
+                used_fallback = True
                 if all_docs:
                     logger.success(f"Semantic search fallback retrieved {len(all_docs)} documents")
         else:
@@ -851,16 +855,26 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
             if not all_docs:
                 logger.warning(f"Multi-retrieve returned empty results, falling back to basic semantic search")
                 all_docs = retriever.invoke(question)
+                used_fallback = True
                 if all_docs:
                     logger.success(f"Basic semantic search fallback retrieved {len(all_docs)} documents")
 
-    # Handle empty results (but allow aggregation queries to continue with analytics only)
-    if not all_docs and query_type not in ("aggregation", "hybrid"):
-        msg = ("No tengo información sobre eso en los documentos disponibles."
-               if lang == 'spanish'
-               else "I don't have information about that in the available documents.")
-        yield msg
-        return
+    # Handle empty results
+    # - aggregation with analytics_context: OK (use analytics only)
+    # - hybrid with analytics_context: OK (use analytics + note about empty docs)
+    # - hybrid without analytics_context AND empty docs: FAIL
+    # - retrieval with empty docs: FAIL
+    if not all_docs:
+        if query_type == "aggregation" and analytics_context:
+            pass  # Continue with analytics only
+        elif query_type == "hybrid" and analytics_context:
+            pass  # Continue with analytics + note about empty docs
+        else:
+            msg = ("No tengo información sobre eso en los documentos disponibles."
+                   if lang == 'spanish'
+                   else "I don't have information about that in the available documents.")
+            yield msg
+            return
 
     # === DEDUPLICATION ===
     original_count = len(all_docs)
@@ -877,8 +891,9 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # Fixed: Use entity_type to correctly detect TSPs vs developers (fixes Q3 ONCOR warning bug)
     # NOTE: Only check for parent_company and tsp_normalized - NOT for fuel_type comparisons
     # fuel_type comparisons (battery vs solar) work via semantic search, not metadata matching
+    # SKIP: If we used fallback semantic search, entity metadata may be incomplete/unreliable
     missing_warning = None
-    if is_comparative:
+    if is_comparative and not used_fallback and all_docs:
         requested_entities = []
         entity_type = 'parent_company'  # Default
 
@@ -909,11 +924,19 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         context = analytics_context
     elif query_type == "hybrid" and analytics_context:
         # Hybrid: merge analytics with document retrieval
-        context = f"""## CORPUS-WIDE STATISTICS
+        if doc_context and doc_context.strip():
+            context = f"""## CORPUS-WIDE STATISTICS
 {analytics_context}
 
 ## RELEVANT DOCUMENT EXCERPTS
 {doc_context}
+"""
+        else:
+            # Hybrid with empty docs - use analytics only (don't show empty section)
+            context = f"""## CORPUS-WIDE STATISTICS
+{analytics_context}
+
+Note: No specific document excerpts found for this query, but the corpus statistics above provide relevant market context.
 """
     else:
         # Standard retrieval
