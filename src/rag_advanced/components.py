@@ -865,13 +865,46 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         logger.info("Using HARD filtering mode")
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
 
-        # === CRITICAL FALLBACK: If hard filter returns empty, try semantic search ===
+        # === CRITICAL FALLBACK #1: If hard filter returns empty, try semantic search ===
         # This handles cases where LLM extracted slightly wrong project names
         if not all_docs and has_explicit_project_names:
             logger.warning(f"Hard filter returned 0 results - falling back to semantic search")
             logger.warning(f"Possible exact match failure for: {metadata_filters['project_name']}")
             all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
             tried_multi_retrieve = True
+
+        # === CRITICAL FALLBACK #2: If hard filter returns PARTIAL results, also fall back ===
+        # This handles: "Compare Headcamp to Quantum Storage" where:
+        # - LLM extracts ["Headcamp", "Quantum Storage"]
+        # - Hard filter finds "Quantum Storage" but NOT "Headcamp" (exact match fails)
+        # - Corpus has "Headcamp Energy Storage Plant" not "Headcamp"
+        # Without this fallback, we'd only get Quantum Storage results!
+        elif all_docs and has_explicit_project_names and not tried_multi_retrieve:
+            requested_projects = metadata_filters.get('project_name', [])
+            if isinstance(requested_projects, list) and len(requested_projects) >= 2:
+                # Check which requested projects are actually in results (case-insensitive partial match)
+                found_project_names = set()
+                for doc in all_docs:
+                    pname = (doc.metadata.get('project_name') or '').upper()
+                    if pname:
+                        found_project_names.add(pname)
+
+                # Check if each requested project has a match (partial matching)
+                missing_projects = []
+                for req_proj in requested_projects:
+                    req_upper = req_proj.upper()
+                    # Check for partial match - "Headcamp" should match "HEADCAMP ENERGY STORAGE PLANT"
+                    found = any(req_upper in found_name or found_name in req_upper for found_name in found_project_names)
+                    if not found:
+                        missing_projects.append(req_proj)
+
+                if missing_projects:
+                    logger.warning(f"Hard filter returned partial results - missing: {missing_projects}")
+                    logger.warning(f"Found projects: {found_project_names}, Requested: {requested_projects}")
+                    logger.warning(f"Falling back to semantic search to find all projects")
+                    # Fall back to semantic search which can handle partial name matching
+                    all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
+                    tried_multi_retrieve = True
 
     # Only try multi_retrieve if we haven't already tried it above
     if not all_docs and not tried_multi_retrieve:
