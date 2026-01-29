@@ -54,14 +54,9 @@ def is_generic_fuel_term(term: str) -> bool:
 
     term_lower = term.lower().strip()
 
-    # Direct match
+    # Direct match against known fuel type keywords
     if term_lower in FUEL_TYPE_KEYWORDS:
         return True
-
-    # Partial match for compound terms (e.g., "solar project")
-    for keyword in FUEL_TYPE_KEYWORDS:
-        if term_lower == keyword:
-            return True
 
     # Very short terms are likely generic (e.g., "PV", "WT")
     if len(term_lower) <= 2:

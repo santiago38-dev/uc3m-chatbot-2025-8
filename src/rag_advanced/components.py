@@ -859,12 +859,11 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     # Use hard filtering if we have a where clause and retriever supports it
     all_docs = []
-    used_hard_filter = False
+    tried_multi_retrieve = False
 
     if where_clause and hasattr(retriever, 'search_with_hard_filters'):
         logger.info("Using HARD filtering mode")
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
-        used_hard_filter = True
 
         # === CRITICAL FALLBACK: If hard filter returns empty, try semantic search ===
         # This handles cases where LLM extracted slightly wrong project names
@@ -872,9 +871,10 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
             logger.warning(f"Hard filter returned 0 results - falling back to semantic search")
             logger.warning(f"Possible exact match failure for: {metadata_filters['project_name']}")
             all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
-            used_hard_filter = False
+            tried_multi_retrieve = True
 
-    if not all_docs:
+    # Only try multi_retrieve if we haven't already tried it above
+    if not all_docs and not tried_multi_retrieve:
         # Standard multi-retrieve with boosting
         all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
 

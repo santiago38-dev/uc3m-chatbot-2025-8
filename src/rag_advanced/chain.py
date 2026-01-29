@@ -373,6 +373,13 @@ def create_comparative_filter_hook(
                 where=where_clause,
                 k=k_for_retrieval  # Use boosted K for comparative, normal K for INR
             )
+
+            # === CRITICAL FALLBACK: If hard filter returns empty, try semantic search ===
+            # This handles cases where INR format doesn't match corpus exactly
+            # or when the specific project isn't in the database
+            if not docs:
+                logger.warning(f"Hard filter returned 0 results for {filter_reason} - falling back to semantic search")
+                docs = retriever.invoke(query)
         else:
             docs = retriever.invoke(query)
 
