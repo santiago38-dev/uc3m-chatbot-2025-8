@@ -12,10 +12,10 @@ import streamlit as st
 from src.add_documents import add_files
 from src.rag_advanced.chain import get_rag_chain
 from src.rag_advanced.components import classify_query
-from src.rag_advanced.utils import RAGMode, set_verbose, detect_language
-from src.vector_store import get_document_content, get_retriever
+from src.rag_advanced.utils import RAGMode, set_verbose, detect_language, config
+from src.vector_store import get_document_content, get_smart_retriever
 
-K_DOCS = 10
+K_DOCS = config.K_DOCS_DEFAULT  # Use centralized config (default: 20)
 
 # --- DIALOGS ---
 @st.dialog("📄 Document Content", width="large")
@@ -112,8 +112,11 @@ def load_topic_model():
 
 @st.cache_resource
 def load_chain(k_docs: int, mode: str, with_summary: bool):
-    """Load retriever + chain only once per process."""
-    retriever = get_retriever(k_docs=k_docs)
+    """Load retriever + chain only once per process.
+
+    Uses SmartRetriever for better filtering and boosting capabilities.
+    """
+    retriever = get_smart_retriever(k_docs=k_docs)
     # Map string mode to Enum
     rag_mode = RAGMode(mode)
     chain = get_rag_chain(retriever, mode=rag_mode, k_docs=k_docs, with_summary=with_summary)
