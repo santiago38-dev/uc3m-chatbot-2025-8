@@ -591,26 +591,43 @@ def execute_retrieval(
         # Empty retrieval
         pass
 
-    # --- Q5 FIX: Add grounding context for developer comparative queries ---
+    # --- Q5/Q8 FIX: Add grounding context for developer queries ---
     # This creates explicit project-developer mappings to prevent misattribution
+    # Extract filters ONCE and reuse (performance fix - was calling twice before)
     filters = extract_multi_filters_from_query(query)
     grounding_context = ""
-    if isinstance(filters.get('parent_company'), list) and len(filters['parent_company']) >= 2:
-        # This is a comparative developer query (e.g., RWE vs SAMSUNG)
+
+    # Trigger grounding context for ANY developer-related query, not just multi-developer
+    # Q5: "RWE vs SAMSUNG" -> parent_company is list
+    # Q8: "RWE vs market" -> parent_company is string, but still needs grounding
+    has_developer_filter = filters.get('parent_company') is not None
+    is_multi_developer = isinstance(filters.get('parent_company'), list) and len(filters['parent_company']) >= 2
+
+    if has_developer_filter and docs:
         grounding_context = create_grounding_context(docs)
         if grounding_context:
-            logger.info("Added grounding context with verified project-developer mappings")
+            dev_type = "multi-developer comparative" if is_multi_developer else "single-developer"
+            logger.info(f"Added grounding context for {dev_type} query with verified project-developer mappings")
+        else:
+            logger.warning("Grounding context empty - no project-developer mappings extracted from docs")
 
     # --- HYBRID PATH: Merge analytics with retrieval ---
     if query_type == "hybrid":
         analytics = load_analytics(analytics_path)
         if analytics:
             analytics_context = get_analytics_context(analytics)
+
+            # Place grounding context prominently if present
+            grounding_section = ""
+            if grounding_context:
+                grounding_section = f"""
+## VERIFIED PROJECT OWNERSHIP (Anti-Hallucination Guard)
+{grounding_context}
+"""
+
             context = f"""## CORPUS-WIDE STATISTICS
 {analytics_context}
-
-{grounding_context}
-
+{grounding_section}
 ## RELEVANT DOCUMENT EXCERPTS
 {retrieval['context']}
 """
@@ -622,7 +639,12 @@ def execute_retrieval(
     else:
         # Add grounding context for retrieval-only mode too
         if grounding_context:
-            context = f"{grounding_context}\n\n{retrieval['context']}"
+            context = f"""## VERIFIED PROJECT OWNERSHIP (Anti-Hallucination Guard)
+{grounding_context}
+
+## RELEVANT DOCUMENT EXCERPTS
+{retrieval['context']}
+"""
             retrieval["context"] = context
         else:
             context = retrieval["context"]
@@ -630,7 +652,7 @@ def execute_retrieval(
 
     # --- THRESHOLD QUERY ENHANCEMENT (Critical for Q2/Q19 >$100/kW queries) ---
     # For threshold queries, get ALL projects meeting the threshold from ChromaDB
-    filters = extract_multi_filters_from_query(query)
+    # NOTE: Reusing 'filters' extracted above (no duplicate extraction)
     security_threshold = filters.get('security_per_kw_min')
     if security_threshold and hasattr(retriever, 'get_all_projects_by_threshold'):
         logger.info(f"THRESHOLD QUERY: Getting all projects with security_per_kw >= ${security_threshold}/kW")
