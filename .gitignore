@@ -4,3 +4,4 @@ venv/
 output/
 *.pyc
 chromadb*
+test_results/

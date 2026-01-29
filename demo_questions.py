@@ -22,10 +22,105 @@ Usage:
 import argparse
 import json
 import re
+import subprocess
 import sys
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+# =============================================================================
+# RESULT LOGGING - Automatic test result archiving
+# =============================================================================
+
+RESULTS_DIR = Path("test_results")
+
+
+def get_git_info() -> Dict[str, str]:
+    """Get current git branch and commit info."""
+    info = {"branch": "unknown", "commit": "unknown", "commit_msg": "unknown"}
+    try:
+        info["branch"] = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        info["commit"] = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        info["commit_msg"] = subprocess.check_output(
+            ["git", "log", "-1", "--pretty=%s"],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()[:80]
+    except Exception:
+        pass
+    return info
+
+
+def save_test_results(
+    results: Dict,
+    mode: str,
+    description: str = "",
+    responses: Dict[str, str] = None
+) -> Path:
+    """
+    Save test results to a timestamped file with metadata.
+
+    Args:
+        results: Dict of {qid: {status, response_len, ...}}
+        mode: "flash", "thinking", or "both"
+        description: Optional description of the test run
+        responses: Optional dict of {qid: full_response_text}
+
+    Returns:
+        Path to the saved results file
+    """
+    RESULTS_DIR.mkdir(exist_ok=True)
+
+    git_info = get_git_info()
+    timestamp = datetime.now()
+
+    # Build filename: YYYY-MM-DD_HHMMSS_branch_mode.json
+    safe_branch = git_info["branch"].replace("/", "-")[:30]
+    filename = f"{timestamp.strftime('%Y-%m-%d_%H%M%S')}_{safe_branch}_{mode}.json"
+    filepath = RESULTS_DIR / filename
+
+    # Calculate summary stats
+    passed = sum(1 for r in results.values() if r.get("status") == "OK")
+    failed = sum(1 for r in results.values() if r.get("status") == "ERROR")
+    content_fail = sum(1 for r in results.values() if r.get("status") == "FAIL")
+
+    output = {
+        "metadata": {
+            "timestamp": timestamp.isoformat(),
+            "mode": mode,
+            "description": description,
+            "git_branch": git_info["branch"],
+            "git_commit": git_info["commit"],
+            "git_commit_msg": git_info["commit_msg"],
+        },
+        "summary": {
+            "total": len(results),
+            "passed": passed,
+            "failed": failed,
+            "content_failures": content_fail,
+        },
+        "results": results,
+    }
+
+    # Include full responses if provided
+    if responses:
+        output["responses"] = responses
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
+
+    print(f"\n📁 Results saved to: {filepath}")
+    print(f"   Branch: {git_info['branch']} @ {git_info['commit']}")
+    print(f"   Commit: {git_info['commit_msg']}")
+
+    return filepath
+
 
 # =============================================================================
 # RESPONSE VALIDATION - Failure Pattern Detection
@@ -449,7 +544,7 @@ def test_full_chain(question: str, mode: str = "flash", verbose: bool = False):
     return response
 
 
-def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Dict[str, str] = None):
+def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Dict[str, str] = None, save_results: bool = True):
     """Test all questions with specified mode."""
     questions = questions or TEST_QUESTIONS
 
@@ -457,7 +552,15 @@ def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Di
     print(f"TESTING ALL QUESTIONS - {mode.upper()} MODE")
     print("=" * 70)
 
+    # Print git info at start
+    git_info = get_git_info()
+    print(f"Branch: {git_info['branch']} @ {git_info['commit']}")
+    print(f"Commit: {git_info['commit_msg']}")
+    print("=" * 70)
+
     results = {}
+    responses = {}  # Store full responses for logging
+
     for qid, question in questions.items():
         # Get metadata if available
         meta = TEST_QUESTIONS_METADATA.get(qid, {})
@@ -470,6 +573,7 @@ def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Di
 
         try:
             response = test_full_chain(question, mode=mode, verbose=verbose)
+            responses[qid] = response  # Store full response
 
             # Check for failure patterns in the response
             failure_pattern = detect_response_failure(response)
@@ -484,6 +588,7 @@ def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Di
                 results[qid] = {"status": "OK", "response_len": len(response)}
         except Exception as e:
             results[qid] = {"status": "ERROR", "error": str(e)}
+            responses[qid] = f"ERROR: {str(e)}"
             print(f"ERROR: {e}")
 
         print("\n" + "-" * 70)
@@ -532,10 +637,19 @@ def test_all_questions(mode: str = "flash", verbose: bool = False, questions: Di
     if content_fail > 0:
         print(f"  ⚠️  {content_fail} responses ran without error but contain failure patterns!")
 
+    # Auto-save results
+    if save_results:
+        save_test_results(
+            results=results,
+            mode=mode,
+            description=f"Automated test run - {len(questions)} questions",
+            responses=responses
+        )
+
     return results
 
 
-def test_all_modes(verbose: bool = False, questions: Dict[str, str] = None):
+def test_all_modes(verbose: bool = False, questions: Dict[str, str] = None, save_results: bool = True):
     """Test all questions with BOTH flash and thinking modes."""
     questions = questions or TEST_QUESTIONS
 
@@ -549,7 +663,7 @@ def test_all_modes(verbose: bool = False, questions: Dict[str, str] = None):
         print(f"\n\n{'#'*70}")
         print(f"# {mode.upper()} MODE")
         print(f"{'#'*70}")
-        all_results[mode] = test_all_questions(mode=mode, verbose=verbose, questions=questions)
+        all_results[mode] = test_all_questions(mode=mode, verbose=verbose, questions=questions, save_results=save_results)
 
     # Final comparison
     print("\n\n" + "=" * 70)
@@ -698,6 +812,8 @@ Examples:
                         help="Check analytics data availability")
     parser.add_argument("--list", action="store_true",
                         help="List all available questions")
+    parser.add_argument("--no-save", action="store_true",
+                        help="Don't save results to file (default: auto-save)")
 
     args = parser.parse_args()
 
@@ -741,11 +857,12 @@ Examples:
         return
 
     # Run all questions
+    save_results = not args.no_save
     if args.all or args.role or args.analytics_only:
         if args.mode == "both":
-            test_all_modes(verbose=args.verbose, questions=questions)
+            test_all_modes(verbose=args.verbose, questions=questions, save_results=save_results)
         else:
-            test_all_questions(mode=args.mode, verbose=args.verbose, questions=questions)
+            test_all_questions(mode=args.mode, verbose=args.verbose, questions=questions, save_results=save_results)
         return
 
     # Determine single question to test
