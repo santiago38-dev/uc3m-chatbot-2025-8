@@ -311,13 +311,19 @@ def get_analytics_context(analytics: Dict) -> str:
     # Specific developer sections - handles both old format and new "specific_developers" format
     specific_devs = analytics.get("specific_developers", {})
 
+    # Helper to handle None values in display (fixes $None/kW display bug)
+    def safe_val(val, default='N/A'):
+        return val if val is not None else default
+
     rwe_data = analytics.get("rwe_specific") or specific_devs.get("RWE", {})
     if rwe_data:
         lines.append("\n### RWE PROJECTS (Q8 reference)")
-        lines.append(f"- Project count: {rwe_data.get('project_count', 'N/A')}")
+        lines.append(f"- Project count: {safe_val(rwe_data.get('project_count'))}")
         if rwe_data.get("median_security_per_kw"):
             lines.append(f"- **RWE Median: ${rwe_data.get('median_security_per_kw')}/kW**")
-            lines.append(f"- Range: ${rwe_data.get('min_security_per_kw', 'N/A')} - ${rwe_data.get('max_security_per_kw', 'N/A')}/kW")
+            min_val = safe_val(rwe_data.get('min_security_per_kw'))
+            max_val = safe_val(rwe_data.get('max_security_per_kw'))
+            lines.append(f"- Range: ${min_val} - ${max_val}/kW")
             # Q8 fix: Include explicit comparison statement
             comparison = rwe_data.get("comparison_statement")
             if comparison:
@@ -330,9 +336,13 @@ def get_analytics_context(analytics: Dict) -> str:
     nextera_data = analytics.get("nextera_specific") or specific_devs.get("NEXTERA", {})
     if nextera_data:
         lines.append("\n### NEXTERA PROJECTS")
-        lines.append(f"- Project count: {nextera_data.get('project_count', 'N/A')}")
+        lines.append(f"- Project count: {safe_val(nextera_data.get('project_count'))}")
         if nextera_data.get("median_security_per_kw"):
             lines.append(f"- **NEXTERA Median: ${nextera_data.get('median_security_per_kw')}/kW**")
+            min_val = safe_val(nextera_data.get('min_security_per_kw'))
+            max_val = safe_val(nextera_data.get('max_security_per_kw'))
+            if min_val != 'N/A' and max_val != 'N/A':
+                lines.append(f"- Range: ${min_val} - ${max_val}/kW")
             comparison = nextera_data.get("comparison_statement")
             if comparison:
                 lines.append(f"- **{comparison}**")
@@ -340,10 +350,12 @@ def get_analytics_context(analytics: Dict) -> str:
     samsung_data = specific_devs.get("SAMSUNG", {})
     if samsung_data:
         lines.append("\n### SAMSUNG PROJECTS")
-        lines.append(f"- Project count: {samsung_data.get('project_count', 'N/A')}")
+        lines.append(f"- Project count: {safe_val(samsung_data.get('project_count'))}")
         if samsung_data.get("median_security_per_kw"):
             lines.append(f"- **SAMSUNG Median: ${samsung_data.get('median_security_per_kw')}/kW**")
-            lines.append(f"- Range: ${samsung_data.get('min_security_per_kw', 'N/A')} - ${samsung_data.get('max_security_per_kw', 'N/A')}/kW")
+            min_val = safe_val(samsung_data.get('min_security_per_kw'))
+            max_val = safe_val(samsung_data.get('max_security_per_kw'))
+            lines.append(f"- Range: ${min_val} - ${max_val}/kW")
             comparison = samsung_data.get("comparison_statement")
             if comparison:
                 lines.append(f"- **{comparison}**")
