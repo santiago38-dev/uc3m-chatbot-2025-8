@@ -23,6 +23,9 @@ from src.rag_advanced.filter_utils import (
     TSP_PATTERNS
 )
 
+# Import centralized config
+from src.rag_advanced.utils import config
+
 load_dotenv()
 
 # Load from .env or use default relative path
@@ -202,10 +205,13 @@ class SmartRetriever:
     def __init__(
         self,
         vectorstore,
-        k: int = 15,
+        k: int = None,
         boost_factor: float = 0.8,
         k_initial: int = 50
     ):
+        # Use centralized config if k not specified
+        if k is None:
+            k = config.K_DOCS_DEFAULT
         self.vectorstore = vectorstore
         self.k = k
         self.boost_factor = boost_factor
@@ -317,7 +323,7 @@ class SmartRetriever:
 
 
 def get_smart_retriever(
-    k_docs: int = 15,
+    k_docs: int = None,
     chromadb_path: str = None,
     boost_factor: float = 0.8,
     k_initial: int = 50
@@ -337,6 +343,10 @@ def get_smart_retriever(
     Returns:
         SmartRetriever instance compatible with LCEL
     """
+    # Use centralized config if k_docs not specified
+    if k_docs is None:
+        k_docs = config.K_DOCS_DEFAULT
+
     vectorstore = get_vectorstore(chromadb_path)
     return SmartRetriever(
         vectorstore=vectorstore,
@@ -347,7 +357,7 @@ def get_smart_retriever(
 
 
 def get_hybrid_retriever(
-    k_docs: int = 15,
+    k_docs: int = None,
     chromadb_path: str = None,
     use_smart: bool = True,
     boost_factor: float = 0.8
@@ -364,6 +374,10 @@ def get_hybrid_retriever(
     Returns:
         Retriever instance
     """
+    # Use centralized config if k_docs not specified
+    if k_docs is None:
+        k_docs = config.K_DOCS_DEFAULT
+
     if use_smart:
         return get_smart_retriever(k_docs=k_docs, chromadb_path=chromadb_path, boost_factor=boost_factor)
     else:

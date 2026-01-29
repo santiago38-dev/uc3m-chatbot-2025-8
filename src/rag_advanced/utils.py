@@ -31,7 +31,7 @@ class RAGConfig:
     """Centralized configuration for RAG pipeline parameters."""
 
     # --- Document Retrieval ---
-    K_DOCS_DEFAULT = 15          # Default docs to retrieve from vector store
+    K_DOCS_DEFAULT = 20          # Default docs to retrieve from vector store
 
     # --- Flash Mode ---
     FLASH_MAX_SOURCES = 10        # Max documents to include in Flash response
