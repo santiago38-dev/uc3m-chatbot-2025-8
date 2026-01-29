@@ -6,7 +6,7 @@ This module is imported by both vector_store.py and chain.py.
 """
 
 import re
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Tuple
 
 from .alias_expander import (
     expand_parent_company_aliases,
@@ -54,6 +54,80 @@ TSP_PATTERNS = {
     'LCRA': r'lcra|lower\s*colorado',
     'SHARYLAND': r'sharyland',
 }
+
+
+# =============================================================================
+# PROJECT NAME EXTRACTION (for comparative queries like Q13)
+# =============================================================================
+
+def extract_project_names_from_comparison(query: str) -> Optional[List[str]]:
+    """
+    Extract project names from a comparison query.
+
+    Examples:
+        "Compare Headcamp Energy Storage Plant to Quantum Storage"
+            -> ['Headcamp Energy Storage Plant', 'Quantum Storage']
+        "Headcamp vs Quantum - what are the differences?"
+            -> ['Headcamp', 'Quantum']
+        "Compare project A to project B"
+            -> ['project A', 'project B']
+
+    Returns:
+        List of project names if found, None otherwise
+    """
+    # Pattern 1: "Compare X to Y" or "Compare X and Y"
+    pattern1 = re.search(
+        r'compare\s+(.+?)\s+(?:to|and|with|versus|vs\.?)\s+(.+?)(?:\s*[-–—]|\s*\?|$)',
+        query, re.IGNORECASE
+    )
+    if pattern1:
+        name1 = pattern1.group(1).strip()
+        name2 = pattern1.group(2).strip()
+        # Clean up common suffixes
+        name2 = re.sub(r'\s*[-–—].*$', '', name2).strip()
+        name2 = re.sub(r'\s*what\s+are.*$', '', name2, flags=re.IGNORECASE).strip()
+        if name1 and name2:
+            return [name1, name2]
+
+    # Pattern 2: "X vs Y" or "X versus Y"
+    pattern2 = re.search(
+        r'([A-Z][A-Za-z\s]+(?:Storage|Plant|Solar|Wind|BESS|Energy|Farm|Project)?)\s+(?:vs\.?|versus)\s+([A-Z][A-Za-z\s]+(?:Storage|Plant|Solar|Wind|BESS|Energy|Farm|Project)?)',
+        query
+    )
+    if pattern2:
+        name1 = pattern2.group(1).strip()
+        name2 = pattern2.group(2).strip()
+        if name1 and name2:
+            return [name1, name2]
+
+    return None
+
+
+def normalize_project_name_for_search(name: str) -> List[str]:
+    """
+    Generate variations of a project name for fuzzy matching.
+
+    "Headcamp Energy Storage Plant" ->
+        ["Headcamp Energy Storage Plant", "Headcamp", "Headcamp Energy", "Headcamp Storage"]
+    """
+    variations = [name]
+
+    # Add first word as variation (often the unique identifier)
+    words = name.split()
+    if len(words) > 1:
+        variations.append(words[0])
+        # Add first two words
+        if len(words) > 2:
+            variations.append(' '.join(words[:2]))
+
+    # Remove common suffixes and add as variation
+    for suffix in ['Energy Storage Plant', 'Storage Plant', 'Storage', 'Plant', 'Solar', 'Wind', 'BESS', 'Farm', 'Project', 'Energy']:
+        if name.endswith(suffix) and name != suffix:
+            base = name[:-len(suffix)].strip()
+            if base and base not in variations:
+                variations.append(base)
+
+    return variations
 
 
 # =============================================================================

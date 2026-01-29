@@ -531,7 +531,6 @@ def execute_retrieval(
     # For threshold queries, get ALL projects meeting the threshold from ChromaDB
     filters = extract_multi_filters_from_query(query)
     security_threshold = filters.get('security_per_kw_min')
-    logger.info(f"DEBUG Threshold: security_threshold={security_threshold}, retriever_type={type(retriever).__name__}, has_method={hasattr(retriever, 'get_all_projects_by_threshold')}")
     if security_threshold and hasattr(retriever, 'get_all_projects_by_threshold'):
         logger.info(f"THRESHOLD QUERY: Getting all projects with security_per_kw >= ${security_threshold}/kW")
         try:
@@ -542,15 +541,26 @@ def execute_retrieval(
             )
             if threshold_projects:
                 logger.success(f"Found {len(threshold_projects)} projects meeting threshold")
-                # Format as a list to prepend to context
-                threshold_list = f"\n## ALL PROJECTS WITH SECURITY >= ${security_threshold}/kW (Complete list from database)\n"
-                threshold_list += f"Total: {len(threshold_projects)} projects\n\n"
+                # Format as a prominent list with explicit instructions
+                threshold_list = f"""
+================================================================================
+COMPLETE DATABASE QUERY RESULTS - AUTHORITATIVE LIST
+================================================================================
+## ALL {len(threshold_projects)} PROJECTS WITH SECURITY >= ${security_threshold}/kW
+
+**IMPORTANT INSTRUCTION:** Your response MUST list ALL {len(threshold_projects)} projects shown below.
+Do NOT say "there are X projects" and then list fewer. List ALL of them.
+
+"""
                 for i, proj in enumerate(threshold_projects, 1):
                     sec_val = proj.get('security_per_kw', 'N/A')
                     sec_str = f"${sec_val:.2f}/kW" if isinstance(sec_val, (int, float)) else sec_val
+                    cap_val = proj.get('capacity_mw', 'N/A')
+                    cap_str = f"{cap_val:.1f} MW" if isinstance(cap_val, (int, float)) else str(cap_val)
                     threshold_list += f"{i}. **{proj['project_name']}** ({proj['inr']}) - {sec_str}\n"
-                    threshold_list += f"   Developer: {proj['developer']} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n"
-                # Prepend threshold list to context
+                    threshold_list += f"   Developer: {proj['developer']} | Capacity: {cap_str} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n\n"
+                threshold_list += "================================================================================\n"
+                # Prepend threshold list to context (BEFORE other content)
                 context = f"{threshold_list}\n{context}"
                 retrieval["context"] = context
         except Exception as e:

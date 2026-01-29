@@ -46,9 +46,16 @@ AGGREGATION_SIGNALS = [
     # Specific aggregation questions
     r'\bwhich (developers?|companies|tsps?|counties|zones?|projects?) have\b',
     r'\bgeographic (concentration|distribution|patterns?)\b',
-    r'\bdiversified (portfolio|mix)\b',
+    r'\bdiversified\b',  # Q7: diversified portfolios
+    r'\btechnology portfolios?\b',  # Q7: technology portfolios
     r'\bmulti[- ]?zone\b',
     r'\b(typical|standard|normal) (security|cost|rate)\b',
+
+    # Q1: Fuel type comparisons (battery vs solar) should use analytics
+    r'\b(battery|storage|bess)\b.*\b(solar|wind)\b.*\b(compare|comparison|versus|vs|difference)\b',
+    r'\b(compare|comparison)\b.*\b(battery|storage|bess)\b.*\b(solar|wind)\b',
+    r'\b(compare|comparison)\b.*\bbetween\b.*\b(battery|storage|solar|wind)\b',
+    r'\bsecurity requirements?\b.*\b(compare|between|battery|solar)\b',
 
     # ERCOT-specific aggregation
     r'\b(security costs?|security deposits?|security amounts?).*(per kw|per mw|\$/kw|\$/mw)\b',
@@ -880,8 +887,13 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     metadata_filters = extract_query_metadata(question)
 
     # 3b. Also run regex-based extraction for threshold queries (more reliable for Q2/Q19)
-    from .filter_utils import extract_multi_filters_from_query
+    from .filter_utils import extract_multi_filters_from_query, extract_project_names_from_comparison, normalize_project_name_for_search
     regex_filters = extract_multi_filters_from_query(question)
+
+    # 3c. Extract project names for comparison queries (Q13: "Compare Headcamp to Quantum")
+    comparison_projects = extract_project_names_from_comparison(question)
+    if comparison_projects:
+        logger.info(f"Detected project comparison: {comparison_projects}")
     # Merge threshold from regex extraction (more reliable than LLM for numeric thresholds)
     if regex_filters.get('security_per_kw_min') and not metadata_filters.get('security_per_kw_min'):
         metadata_filters['security_per_kw_min'] = regex_filters['security_per_kw_min']
@@ -898,21 +910,34 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     has_specific_zone = isinstance(extracted_filters.get('zone'), str) and extracted_filters.get('zone')
 
     # Check for project_name from LLM extraction (Q17: "What is the security deposit for Quantum Storage?")
-    # BUT: Don't hard filter on project_name for comparative queries (Q13: "Compare Headcamp to Quantum")
-    # because we need documents from BOTH projects, not just one
     has_specific_project = isinstance(metadata_filters.get('project_name'), str) and metadata_filters.get('project_name')
 
     # Detect if this is a project comparison query (mentions "compare", "vs", "versus" with project names)
     is_project_comparison = bool(re.search(r'\b(compare|vs\.?|versus)\b', question.lower()))
 
     # Merge project_name from LLM extraction into extracted_filters for hard filtering
-    # ONLY for single-project lookups, NOT for project comparisons
     combined_filters = dict(extracted_filters) if extracted_filters else {}
-    if has_specific_project and not is_project_comparison:
+
+    # For project comparison queries (Q13), build multi-project filter with $in
+    if comparison_projects and is_project_comparison:
+        # Build list of all project name variations for fuzzy matching
+        all_variations = []
+        for proj_name in comparison_projects:
+            variations = normalize_project_name_for_search(proj_name)
+            all_variations.extend(variations)
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_variations = []
+        for v in all_variations:
+            if v.lower() not in seen:
+                seen.add(v.lower())
+                unique_variations.append(v)
+        combined_filters['project_name'] = unique_variations
+        logger.info(f"Project comparison filter: searching for {unique_variations}")
+    elif has_specific_project and not is_project_comparison:
+        # Single project lookup (Q17)
         combined_filters['project_name'] = metadata_filters['project_name']
         logger.info(f"LLM extracted project_name for hard filter: {metadata_filters['project_name']}")
-    elif has_specific_project and is_project_comparison:
-        logger.info(f"Skipping project_name hard filter for comparison query (need docs from multiple projects)")
 
     if combined_filters:
         # Build safe where clause excluding fuel_type from hard filtering
@@ -933,13 +958,16 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     # Use hard filtering for comparative queries, INR lookups, zone-specific, or project-specific queries
     # NOTE: is_comparative is set in chain.py for parent_company and tsp_normalized comparisons
-    # NOTE: Don't hard filter on project_name alone for project comparison queries (Q13)
+    # For project comparison queries (Q13), we NOW use hard filtering with multi-project $in filter
     use_project_filter = has_specific_project and not is_project_comparison
-    should_hard_filter = (is_comparative or has_specific_inr or has_specific_zone or use_project_filter) and where_clause and hasattr(retriever, 'search_with_hard_filters')
+    use_comparison_filter = comparison_projects and is_project_comparison  # NEW: use hard filter for project comparisons
+    should_hard_filter = (is_comparative or has_specific_inr or has_specific_zone or use_project_filter or use_comparison_filter) and where_clause and hasattr(retriever, 'search_with_hard_filters')
 
     if should_hard_filter:
         if has_specific_inr:
             filter_type = "INR lookup"
+        elif use_comparison_filter:
+            filter_type = "project comparison (multi-project)"
         elif use_project_filter:
             filter_type = "project name lookup"
         elif has_specific_zone:
@@ -1046,29 +1074,36 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # For threshold queries, get ALL projects meeting the threshold from ChromaDB
     # This ensures we don't miss projects that semantic search didn't find
     security_threshold = metadata_filters.get('security_per_kw_min')
-    print(f">>> DEBUG Threshold: security_threshold={security_threshold}, retriever_type={type(retriever).__name__}, has_method={hasattr(retriever, 'get_all_projects_by_threshold')}")
     if security_threshold and hasattr(retriever, 'get_all_projects_by_threshold'):
-        print(f">>> Calling get_all_projects_by_threshold...")
+        logger.info(f"THRESHOLD QUERY: Getting all projects with security_per_kw >= ${security_threshold}/kW")
         try:
             threshold_projects = retriever.get_all_projects_by_threshold(
                 threshold_field='security_per_kw',
                 threshold_value=security_threshold,
                 operator='$gte'
             )
-            print(f">>> Found {len(threshold_projects)} projects from ChromaDB:")
-            for p in threshold_projects[:8]:
-                print(f">>>   {p['project_name']} ({p['inr']}): ${p.get('security_per_kw', 'N/A')}/kW")
             if threshold_projects:
                 logger.success(f"Found {len(threshold_projects)} projects meeting threshold")
-                # Format as a list to prepend to context
-                threshold_list = f"\n## ALL PROJECTS WITH SECURITY >= ${security_threshold}/kW (Complete list from database)\n"
-                threshold_list += f"Total: {len(threshold_projects)} projects\n\n"
+                # Format as a prominent list with explicit instructions
+                threshold_list = f"""
+================================================================================
+COMPLETE DATABASE QUERY RESULTS - AUTHORITATIVE LIST
+================================================================================
+## ALL {len(threshold_projects)} PROJECTS WITH SECURITY >= ${security_threshold}/kW
+
+**IMPORTANT INSTRUCTION:** Your response MUST list ALL {len(threshold_projects)} projects shown below.
+Do NOT say "there are X projects" and then list fewer. List ALL of them.
+
+"""
                 for i, proj in enumerate(threshold_projects, 1):
                     sec_val = proj.get('security_per_kw', 'N/A')
                     sec_str = f"${sec_val:.2f}/kW" if isinstance(sec_val, (int, float)) else sec_val
+                    cap_val = proj.get('capacity_mw', 'N/A')
+                    cap_str = f"{cap_val:.1f} MW" if isinstance(cap_val, (int, float)) else str(cap_val)
                     threshold_list += f"{i}. **{proj['project_name']}** ({proj['inr']}) - {sec_str}\n"
-                    threshold_list += f"   Developer: {proj['developer']} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n"
-                # Prepend threshold list to context
+                    threshold_list += f"   Developer: {proj['developer']} | Capacity: {cap_str} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n\n"
+                threshold_list += "================================================================================\n"
+                # Prepend threshold list to context (BEFORE other content)
                 context = f"{threshold_list}\n{context}"
                 retrieval["context"] = context
         except Exception as e:
