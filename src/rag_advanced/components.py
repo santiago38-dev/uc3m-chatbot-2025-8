@@ -1011,6 +1011,9 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         if len(all_docs) < original_count:
             logger.info(f"Deduplicated: {original_count} -> {len(all_docs)} documents")
 
+    # Initialize missing_warning before threshold filtering (may be set there)
+    missing_warning = None
+
     # === POST-RETRIEVAL THRESHOLD FILTERING (Critical for Q2/Q19) ===
     # Filter out documents that don't meet threshold criteria BEFORE LLM sees them
     # This prevents the LLM from hallucinating projects below the threshold
@@ -1051,7 +1054,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # NOTE: Only check for parent_company and tsp_normalized - NOT for fuel_type comparisons
     # fuel_type comparisons (battery vs solar) work via semantic search, not metadata matching
     # Skip if no docs (hybrid queries may continue with analytics only)
-    missing_warning = None
+    # NOTE: missing_warning may already be set by threshold filtering above
     if is_comparative and all_docs:
         requested_entities = []
         entity_type = 'parent_company'  # Default
