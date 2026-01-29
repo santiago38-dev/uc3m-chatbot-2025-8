@@ -611,60 +611,45 @@ def multi_retrieve(queries: List[str], retriever, filters: Dict[str, Any] = None
     seen_contents = set()
 
     def retrieve_single(query: str) -> List:
-        # If retriever supports 'filters', pass them.
-        # SmartRetriever uses invoke(query), but we can't easily pass kwargs via invoke()
-        # unless we modify SmartRetriever to look for a special query dict or use a different method.
-        # HACK: If filters exist, we can assume the retriever exposes a method to set them
-        # or we rely on the retriever to handle it.
-        # Given we are modifying this, we should assume the retriever is capable.
+        """Retrieve documents for a single query with error handling."""
+        try:
+            docs = []
+            # Try search_with_filters first (soft boosting)
+            if hasattr(retriever, 'search_with_filters'):
+                docs = retriever.search_with_filters(query, filters)
+            else:
+                docs = retriever.invoke(query)
 
-        # Determine internal K for this specific query if overridden
-        # Standard retriever.invoke(q) doesn't accept k.
-        # We need to rely on the retriever instance if it has search methods.
+            # Enforce per-query k limit
+            if k and len(docs) > k:
+                docs = docs[:k]
 
-        current_retriever = retriever
-
-        # If k is provided, we might need to adjust the retriever's k temporarily?
-        # Or call similarity_search directly if it's exposed.
-        # Assuming LangChain retriever, often vectorstore.as_retriever()
-
-        # Using vectorstore directly if accessible (common pattern in custom retrievers)
-        if hasattr(retriever, 'vectorstore'):
-             # Use the underlying vectorstore search if possible to control k
-             if filters:
-                 # Check if our custom SmartRetriever
-                 if hasattr(retriever, 'search_with_filters'):
-                      # SmartRetriever search_with_filters usually respects self.k,
-                      # we may need to hint k if possible, but our implementation currently doesn't allow overriding k in search_with_filters easily
-                      # unless we changed it. Wait, I saw SmartRetriever definition earlier.
-                      # It uses self.k.
-                      pass
-
-        # For now, let's just retrieve and slice manually if the retriever returns more
-
-        docs = []
-        if hasattr(retriever, 'search_with_filters'):
-             docs = retriever.search_with_filters(query, filters)
-        else:
-             docs = retriever.invoke(query)
-
-        # Enforce per-query k limit manually here incase retriever returned more
-        if k and len(docs) > k:
-            docs = docs[:k]
-
-        return docs
+            return docs
+        except Exception as e:
+            logger.warning(f"Retrieval failed for query '{query[:50]}...': {e}")
+            # Fallback: try basic invoke without filters
+            try:
+                return retriever.invoke(query)[:k] if k else retriever.invoke(query)
+            except Exception as e2:
+                logger.warning(f"Fallback retrieval also failed: {e2}")
+                return []
 
     # Parallelize retrieval for all queries
     with ThreadPoolExecutor(max_workers=config.RETRIEVAL_WORKERS) as executor:
         futures = [executor.submit(retrieve_single, q) for q in queries]
 
         for future in as_completed(futures):
-            docs = future.result()
-            for doc in docs:
-                content_hash = hash(doc.page_content[:200])
-                if content_hash not in seen_contents:
-                    seen_contents.add(content_hash)
-                    all_docs.append(doc)
+            try:
+                docs = future.result()
+                for doc in docs:
+                    # Handle potential missing page_content
+                    content = getattr(doc, 'page_content', '')[:200] if hasattr(doc, 'page_content') else ''
+                    content_hash = hash(content)
+                    if content_hash not in seen_contents:
+                        seen_contents.add(content_hash)
+                        all_docs.append(doc)
+            except Exception as e:
+                logger.warning(f"Error processing retrieval result: {e}")
 
     logger.success(f"Retrieved {len(all_docs)} unique documents")
     return all_docs
@@ -745,9 +730,11 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     """Thinking mode: Structured response with validation.
 
     Enhanced with:
+    - Query type routing (aggregation/hybrid/retrieval) like FLASH mode
     - Hard filtering for comparative queries with alias expansion
     - Deduplication by INR to prevent listing same projects multiple times
     - Missing entity warnings
+    - Fallback to semantic search if hard filtering returns empty
 
     Flow: Classify → Extract Metadata → Expand queries → Retrieve → Dedupe → Generate → Validate
     Note: Domain guardrail is checked in thinking_generator before this is called.
@@ -766,6 +753,8 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     with_summary = input_dict.get("with_summary", False)
     extracted_filters = input_dict.get("extracted_filters", {})
     is_comparative = input_dict.get("is_comparative", False)
+    query_type = input_dict.get("_query_type", "retrieval")  # Get query type from chain.py
+    analytics_path = input_dict.get("_analytics_path", "data/corpus_analytics.json")
 
     # Use k_total if provided, else fallback to config default
     max_docs = k_total if k_total else config.K_DOCS_DEFAULT
@@ -777,6 +766,7 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     logger.info("THINKING MODE ACTIVATED")
     logger.info("=" * 50)
     logger.info(f"Language: {lang}")
+    logger.info(f"Query type: {query_type}")
     if is_comparative:
         logger.info(f"Comparative query detected with filters: {extracted_filters}")
 
@@ -790,42 +780,82 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # 4. Query Expansion
     queries = expand_query(question)
 
-    # 5. Build hard filter for comparative and INR queries
-    # NOTE: Only hard filter on parent_company, tsp_normalized, and inr
-    # fuel_type has too many null values in the corpus, causing empty results
-    where_clause = None
-    has_specific_inr = isinstance(extracted_filters.get('inr'), str) and extracted_filters.get('inr')
+    # === ANALYTICS CONTEXT (for aggregation/hybrid queries) ===
+    # Import analytics functions from chain.py to match FLASH behavior
+    analytics_context = ""
+    if query_type in ("aggregation", "hybrid"):
+        try:
+            import json
+            from pathlib import Path
+            analytics_file = Path(analytics_path)
+            if analytics_file.exists():
+                with open(analytics_file, "r", encoding="utf-8") as f:
+                    analytics = json.load(f)
+                # Import formatting function
+                from .chain import get_analytics_context
+                analytics_context = get_analytics_context(analytics)
+                logger.success(f"Loaded analytics context for {query_type} query")
+        except Exception as e:
+            logger.warning(f"Failed to load analytics: {e}")
 
-    if extracted_filters:
-        # Build safe where clause excluding fuel_type from hard filtering
-        safe_filters = {k: v for k, v in extracted_filters.items()
-                       if k in ('parent_company', 'tsp_normalized', 'inr')}
-        if safe_filters:
-            where_clause = build_chromadb_where_clause(safe_filters, expand_aliases=True)
-            if where_clause:
-                logger.info(f"Built ChromaDB where clause (safe fields only): {where_clause}")
-
-    # 6. Multi-Query Retrieval
-    # Strategy: Split K total budget across N queries
-    num_queries = len(queries)
-    k_per_query = max(1, max_docs // num_queries) if max_docs else None
-
-    logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
-
-    # Use hard filtering for comparative queries (parent_company/tsp comparisons) or INR lookups
-    # NOTE: is_comparative is set in chain.py for parent_company and tsp_normalized comparisons
-    should_hard_filter = (is_comparative or has_specific_inr) and where_clause and hasattr(retriever, 'search_with_hard_filters')
-
-    if should_hard_filter:
-        filter_type = "INR lookup" if has_specific_inr else "comparative query"
-        logger.info(f"Using HARD filtering mode for {filter_type}")
-        # For hard filtering, we retrieve with the filter applied
-        all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
+    # For pure aggregation queries, skip retrieval entirely
+    if query_type == "aggregation" and analytics_context:
+        logger.info("Pure aggregation query - using analytics only (no retrieval)")
+        all_docs = []  # No document retrieval needed
+        # We'll use analytics_context directly for response generation
     else:
-        # Standard multi-retrieve with boosting
-        all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
+        # 5. Build hard filter for comparative and INR queries
+        # NOTE: Only hard filter on parent_company, tsp_normalized, and inr
+        # fuel_type has too many null values in the corpus, causing empty results
+        where_clause = None
+        has_specific_inr = isinstance(extracted_filters.get('inr'), str) and extracted_filters.get('inr')
 
-    if not all_docs:
+        if extracted_filters:
+            # Build safe where clause excluding fuel_type from hard filtering
+            safe_filters = {k: v for k, v in extracted_filters.items()
+                           if k in ('parent_company', 'tsp_normalized', 'inr')}
+            if safe_filters:
+                where_clause = build_chromadb_where_clause(safe_filters, expand_aliases=True)
+                if where_clause:
+                    logger.info(f"Built ChromaDB where clause (safe fields only): {where_clause}")
+
+        # 6. Multi-Query Retrieval
+        # Strategy: Split K total budget across N queries
+        num_queries = len(queries)
+        k_per_query = max(1, max_docs // num_queries) if max_docs else None
+
+        logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
+
+        # Use hard filtering for comparative queries (parent_company/tsp comparisons) or INR lookups
+        # NOTE: is_comparative is set in chain.py for parent_company and tsp_normalized comparisons
+        should_hard_filter = (is_comparative or has_specific_inr) and where_clause and hasattr(retriever, 'search_with_hard_filters')
+
+        all_docs = []
+        if should_hard_filter:
+            filter_type = "INR lookup" if has_specific_inr else "comparative query"
+            logger.info(f"Using HARD filtering mode for {filter_type}")
+            # For hard filtering, we retrieve with the filter applied
+            all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
+
+            # FALLBACK: If hard filter returns empty but we expected results, try semantic search
+            if not all_docs:
+                logger.warning(f"Hard filter returned empty results, falling back to semantic search")
+                all_docs = retriever.invoke(question)
+                if all_docs:
+                    logger.success(f"Semantic search fallback retrieved {len(all_docs)} documents")
+        else:
+            # Standard multi-retrieve with boosting
+            all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
+
+            # FALLBACK: If multi-retrieve returns empty, try basic semantic search
+            if not all_docs:
+                logger.warning(f"Multi-retrieve returned empty results, falling back to basic semantic search")
+                all_docs = retriever.invoke(question)
+                if all_docs:
+                    logger.success(f"Basic semantic search fallback retrieved {len(all_docs)} documents")
+
+    # Handle empty results (but allow aggregation queries to continue with analytics only)
+    if not all_docs and query_type not in ("aggregation", "hybrid"):
         msg = ("No tengo información sobre eso en los documentos disponibles."
                if lang == 'spanish'
                else "I don't have information about that in the available documents.")
@@ -871,9 +901,25 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     # 7. Format sources for response
     retrieval = format_sources(all_docs)
-    context = retrieval["context"]
+    doc_context = retrieval["context"]
 
-    # 7. Generate Response
+    # Build final context based on query type (matching FLASH mode behavior)
+    if query_type == "aggregation" and analytics_context:
+        # Pure aggregation: use analytics only
+        context = analytics_context
+    elif query_type == "hybrid" and analytics_context:
+        # Hybrid: merge analytics with document retrieval
+        context = f"""## CORPUS-WIDE STATISTICS
+{analytics_context}
+
+## RELEVANT DOCUMENT EXCERPTS
+{doc_context}
+"""
+    else:
+        # Standard retrieval
+        context = doc_context
+
+    # 8. Generate Response
     logger.step("Generating response...")
     system_template = SYSTEM_ES if lang == 'spanish' else SYSTEM_EN
     enhanced_system = f"{system_template}\n\n{format_instructions}"
