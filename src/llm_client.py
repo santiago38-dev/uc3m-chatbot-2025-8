@@ -33,7 +33,8 @@ def call_llm_api(prompt_text: str) -> Generator[str, None, None]:
     }
 
     try:
-        with requests.post(LLM_API_URL, headers=headers, json=payload, stream=True) as response:
+        # Timeout: 120s connect, 300s read (5 min max for complex queries)
+        with requests.post(LLM_API_URL, headers=headers, json=payload, stream=True, timeout=(120, 300)) as response:
             response.raise_for_status()
 
             for line in response.iter_lines(decode_unicode=True):
