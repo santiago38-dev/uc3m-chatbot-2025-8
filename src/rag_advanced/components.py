@@ -901,9 +901,22 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
                 if missing_projects:
                     logger.warning(f"Hard filter returned partial results - missing: {missing_projects}")
                     logger.warning(f"Found projects: {found_project_names}, Requested: {requested_projects}")
-                    logger.warning(f"Falling back to semantic search to find all projects")
-                    # Fall back to semantic search which can handle partial name matching
-                    all_docs = multi_retrieve(queries, retriever, filters=metadata_filters, k=k_per_query)
+                    logger.warning(f"Falling back to per-project semantic search to ensure balanced retrieval")
+
+                    # === CRITICAL: Search for EACH project separately to ensure balanced results ===
+                    # Plain semantic search might favor one project over another
+                    # By searching per-project, we guarantee docs from BOTH projects
+                    all_project_docs = []
+                    k_per_project = max(5, max_docs // len(requested_projects))
+
+                    for proj_name in requested_projects:
+                        # Search specifically for this project
+                        proj_query = f"{proj_name} {question}"
+                        proj_docs = retriever.invoke(proj_query)[:k_per_project]
+                        logger.info(f"Per-project search for '{proj_name}': found {len(proj_docs)} docs")
+                        all_project_docs.extend(proj_docs)
+
+                    all_docs = all_project_docs
                     tried_multi_retrieve = True
 
     # Only try multi_retrieve if we haven't already tried it above
