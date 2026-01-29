@@ -745,11 +745,13 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     """Thinking mode: Structured response with validation.
 
     Enhanced with:
+    - Analytics routing for aggregation queries (Q7-Q12)
     - Hard filtering for comparative queries with alias expansion
+    - Post-retrieval threshold filtering for numeric queries (Q2/Q19)
     - Deduplication by INR to prevent listing same projects multiple times
     - Missing entity warnings
 
-    Flow: Classify → Extract Metadata → Expand queries → Retrieve → Dedupe → Generate → Validate
+    Flow: Classify → Route (analytics/retrieval/hybrid) → Filter → Dedupe → Generate → Validate
     Note: Domain guardrail is checked in thinking_generator before this is called.
     """
     # Import from filter_utils to avoid circular imports
@@ -767,6 +769,10 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     extracted_filters = input_dict.get("extracted_filters", {})
     is_comparative = input_dict.get("is_comparative", False)
 
+    # Get analytics routing info from chain.py
+    query_type = input_dict.get("_query_type", "retrieval")
+    analytics_path = input_dict.get("_analytics_path", "data/corpus_analytics.json")
+
     # Use k_total if provided, else fallback to config default
     max_docs = k_total if k_total else config.K_DOCS_DEFAULT
 
@@ -777,10 +783,82 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     logger.info("THINKING MODE ACTIVATED")
     logger.info("=" * 50)
     logger.info(f"Language: {lang}")
+    logger.info(f"Query type: {query_type}")
     if is_comparative:
         logger.info(f"Comparative query detected with filters: {extracted_filters}")
 
-    # 2. Classify Question Type
+    # === ANALYTICS ROUTING (Critical for Q7-Q12) ===
+    # Load analytics for aggregation and hybrid queries
+    analytics_context = None
+    if query_type in ("aggregation", "hybrid"):
+        try:
+            from .chain import load_analytics, get_analytics_context
+            analytics = load_analytics(analytics_path)
+            if analytics:
+                analytics_context = get_analytics_context(analytics)
+                logger.success(f"Loaded corpus analytics for {query_type} query")
+        except Exception as e:
+            logger.warning(f"Failed to load analytics: {e}")
+
+    # For pure aggregation queries, use analytics directly (skip retrieval)
+    if query_type == "aggregation" and analytics_context:
+        logger.info("AGGREGATION PATH: Using corpus analytics (no document retrieval)")
+
+        # 2. Classify Question Type
+        question_type = classify_question(question)
+        format_instructions = get_format_instructions(question_type, lang)
+
+        # Generate response from analytics
+        system_template = SYSTEM_ES if lang == 'spanish' else SYSTEM_EN
+        enhanced_system = f"{system_template}\n\n{format_instructions}"
+
+        prompt_template = ChatPromptTemplate.from_messages([
+            ("system", enhanced_system),
+            ("placeholder", "{chat_history}"),
+            ("human", "{question}")
+        ])
+
+        prompt_str = prompt_template.invoke({
+            "context": analytics_context,
+            "chat_history": history,
+            "question": question
+        }).to_string()
+
+        response = call_llm_api_full(prompt_str)
+        response = clean_response(response)
+
+        # Validation
+        final_response, was_fixed = validate_response(
+            question=question,
+            question_type=question_type,
+            response=response,
+            context=analytics_context,
+            lang=lang
+        )
+
+        # Stream output for aggregation
+        validation_status = "Fixed ⚠" if was_fixed else "Passed ✓"
+        thought_summary = f"""**💭 Analysis process:**
+- Question type: {question_type.value.replace("_", " ").title()}
+- Data source: Corpus Analytics (pre-computed statistics)
+- Validation: {validation_status}
+
+---
+
+**📋 Answer:**
+"""
+        yield thought_summary
+        yield final_response
+        yield "\n\n**Sources:** Pre-computed corpus analytics from 132 ERCOT interconnection agreements"
+
+        if with_summary:
+            summary = generate_summary(analytics_context, lang)
+            summary_header = "\n\n--- Resumen ---\n" if lang == 'spanish' else "\n\n--- Summary ---\n"
+            yield summary_header
+            yield summary
+        return
+
+    # 2. Classify Question Type (for retrieval/hybrid paths)
     question_type = classify_question(question)
     format_instructions = get_format_instructions(question_type, lang)
 
@@ -856,6 +934,35 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     if len(all_docs) < original_count:
         logger.info(f"Deduplicated: {original_count} -> {len(all_docs)} documents")
 
+    # === POST-RETRIEVAL THRESHOLD FILTERING (Critical for Q2/Q19) ===
+    # Filter out documents that don't meet threshold criteria BEFORE LLM sees them
+    # This prevents the LLM from hallucinating projects below the threshold
+    security_threshold = metadata_filters.get('security_per_kw_min')
+    if security_threshold:
+        pre_filter_count = len(all_docs)
+        filtered_docs = []
+        for doc in all_docs:
+            doc_security = doc.metadata.get('security_per_kw')
+            if doc_security is not None and doc_security >= security_threshold:
+                filtered_docs.append(doc)
+            elif doc_security is None:
+                # Keep docs without security data (might be relevant for other info)
+                # but log this case
+                logger.debug(f"Keeping doc without security_per_kw: {doc.metadata.get('inr', 'unknown')}")
+                # Actually, for threshold queries, we should SKIP docs without the field
+                # to avoid LLM confusion
+                pass  # Skip docs without security_per_kw for threshold queries
+
+        if filtered_docs:
+            all_docs = filtered_docs
+            logger.success(f"Threshold filter (>=${security_threshold}/kW): {pre_filter_count} -> {len(all_docs)} docs")
+        else:
+            # If filter removed ALL docs, warn but keep some for context
+            logger.warning(f"Threshold filter removed all docs! Keeping original {pre_filter_count} docs with warning")
+            # Add a flag to warn user
+            if not missing_warning:
+                missing_warning = f"⚠️ Note: Few or no projects in the retrieved documents meet the ${security_threshold}/kW threshold. Results may be limited.\n"
+
     # Final safety clamp to k_total (in case disjoint sets exceeded total)
     if max_docs and len(all_docs) > max_docs:
         logger.info(f"Clamping final merged documents from {len(all_docs)} to {max_docs}")
@@ -891,7 +998,19 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     retrieval = format_sources(all_docs)
     context = retrieval["context"]
 
-    # 7. Generate Response
+    # === HYBRID CONTEXT MERGING (Critical for Q7-Q12 comparative analytics) ===
+    # For hybrid queries, prepend analytics context to retrieved documents
+    if query_type == "hybrid" and analytics_context:
+        logger.info("HYBRID PATH: Merging corpus analytics with document retrieval")
+        context = f"""## CORPUS-WIDE STATISTICS (Pre-computed from ALL 132 projects)
+{analytics_context}
+
+## RELEVANT DOCUMENT EXCERPTS (From specific matching projects)
+{context}
+"""
+        retrieval["context"] = context
+
+    # 8. Generate Response
     logger.step("Generating response...")
     system_template = SYSTEM_ES if lang == 'spanish' else SYSTEM_EN
     enhanced_system = f"{system_template}\n\n{format_instructions}"

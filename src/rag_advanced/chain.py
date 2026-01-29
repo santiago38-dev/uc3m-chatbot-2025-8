@@ -390,6 +390,25 @@ def create_comparative_filter_hook(
         if len(docs) < original_count:
             logger.info(f"Deduplicated: {original_count} -> {len(docs)} documents")
 
+        # === POST-RETRIEVAL THRESHOLD FILTERING (Critical for Q2/Q19) ===
+        # Filter out documents that don't meet threshold criteria BEFORE LLM sees them
+        security_threshold = filters.get('security_per_kw_min')
+        if security_threshold:
+            pre_filter_count = len(docs)
+            filtered_docs = []
+            for doc in docs:
+                doc_security = doc.metadata.get('security_per_kw')
+                if doc_security is not None and doc_security >= security_threshold:
+                    filtered_docs.append(doc)
+                # Skip docs without security_per_kw for threshold queries
+
+            if filtered_docs:
+                docs = filtered_docs
+                logger.success(f"Threshold filter (>=${security_threshold}/kW): {pre_filter_count} -> {len(docs)} docs")
+            else:
+                # If filter removed ALL docs, warn user
+                logger.warning(f"Threshold filter removed all docs! Keeping original {pre_filter_count} docs with warning")
+
         # Check for missing entities (only for parent_company and tsp_normalized comparisons)
         # NOTE: Skip missing entity warnings for fuel_type - those comparisons work differently
         missing_warning = None
