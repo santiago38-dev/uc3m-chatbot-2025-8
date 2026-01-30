@@ -14,6 +14,7 @@ from src.rag_advanced.chain import get_rag_chain
 from src.rag_advanced.components import classify_query
 from src.rag_advanced.utils import RAGMode, set_verbose, detect_language, config
 from src.vector_store import get_document_content, get_smart_retriever
+from src.chat_history import clear_session_history
 
 K_DOCS = config.K_DOCS_DEFAULT  # Use centralized config (default: 20)
 
@@ -110,11 +111,28 @@ from src.topics_bertopic import load_bertopic, merge_intent_and_grounded_topics,
 def load_topic_model():
     return load_bertopic("output/bertopic_model.pkl")
 
+def _get_chain_version():
+    """Generate a version hash from chain.py and components.py to invalidate cache on code changes."""
+    import hashlib
+    try:
+        version_data = ""
+        for filepath in ["src/rag_advanced/chain.py", "src/rag_advanced/components.py",
+                         "src/rag_advanced/filter_utils.py", "src/vector_store.py"]:
+            with open(filepath, "r") as f:
+                version_data += f.read()
+        return hashlib.md5(version_data.encode()).hexdigest()[:8]
+    except Exception:
+        return "v1"
+
+# Cache key includes code version to invalidate cache when code changes
+_CHAIN_VERSION = _get_chain_version()
+
 @st.cache_resource
-def load_chain(k_docs: int, mode: str, with_summary: bool):
+def load_chain(k_docs: int, mode: str, with_summary: bool, _version: str = _CHAIN_VERSION):
     """Load retriever + chain only once per process.
 
     Uses SmartRetriever for better filtering and boosting capabilities.
+    Cache is invalidated when chain/components/filter code changes.
     """
     retriever = get_smart_retriever(k_docs=k_docs)
     # Map string mode to Enum
@@ -181,6 +199,9 @@ with st.sidebar:
     k_docs = st.slider("Number of retrieved documents", 1, 50, K_DOCS)
 
     if st.button("New chat"):
+        # Clear chat history from the internal store before clearing session state
+        if "session_id" in st.session_state:
+            clear_session_history(st.session_state.session_id)
         st.session_state.clear()
         st.rerun()
 
