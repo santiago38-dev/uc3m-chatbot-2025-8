@@ -325,7 +325,6 @@ def generate_summary(context: str, lang: str = 'english', max_docs: int = 3) -> 
     logger.step(f"Generating summary (top {max_docs} docs)...")
 
     # Extract individual documents from context
-    import re
     # Split by [Source N: markers but keep the delimiters
     parts = re.split(r'(\[Source \d+:)', context)
 
@@ -735,7 +734,6 @@ def extract_query_metadata(question: str) -> Dict[str, Any]:
         if "```" in result:
              # Try to find the content inside ```json ... ``` or just ``` ... ```
              # We look for the first block
-             import re
              code_block = re.search(r'```(?:json)?(.*?)```', result, re.DOTALL)
              if code_block:
                  cleaned_result = code_block.group(1).strip()
