@@ -260,11 +260,10 @@ def normalize_project_name_for_search(name: str) -> List[str]:
     Generate variations of a project name for fuzzy matching.
 
     "Champaign BESS" ->
-        ["Champaign BESS", "Champaign", "Champaign Battery", "Champaign Storage",
-         "Champaign Energy Storage", "Champaign Battery Energy Storage"]
+        ["Champaign BESS", "champaign bess", "CHAMPAIGN BESS", "Champaign",
+         "Champaign Battery", "Champaign Storage", ...]
 
-    "Headcamp Energy Storage Plant" ->
-        ["Headcamp Energy Storage Plant", "Headcamp", "Headcamp Energy", "Headcamp Storage"]
+    Includes case variations to handle ChromaDB's case-sensitive $in operator.
     """
     variations = [name]
     seen = {name.lower()}  # Track lowercase to avoid duplicates
@@ -313,6 +312,21 @@ def normalize_project_name_for_search(name: str) -> List[str]:
     if len(words) == 1:
         for suffix in ['BESS', 'Battery', 'Storage', 'Energy Storage', 'Solar', 'Wind']:
             add_variation(f"{name} {suffix}")
+
+    # CRITICAL: Add case variations for ChromaDB's case-sensitive $in operator
+    # ChromaDB uses exact string matching, so "Champaign BESS" won't match "CHAMPAIGN BESS"
+    case_variants = []
+    for v in variations:
+        # Add lowercase and uppercase versions
+        v_lower = v.lower()
+        v_upper = v.upper()
+        if v_lower not in seen:
+            seen.add(v_lower)
+            case_variants.append(v_lower)
+        if v_upper not in seen:
+            seen.add(v_upper.lower())  # Track by lowercase to avoid dups
+            case_variants.append(v_upper)
+    variations.extend(case_variants)
 
     return variations
 
