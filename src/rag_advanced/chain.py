@@ -458,13 +458,15 @@ def create_comparative_filter_hook(
         has_specific_zone = isinstance(filters.get('zone'), str) and filters.get('zone')
 
         # Check for project_name queries (e.g., "What is the security deposit for Champaign BESS?")
+        # Handles BOTH single project (string) AND project comparisons (list)
         has_specific_project = isinstance(filters.get('project_name'), str) and filters.get('project_name')
+        has_project_comparison = isinstance(filters.get('project_name'), list) and len(filters.get('project_name', [])) > 0
 
         # Check for county-specific queries (e.g., "Which projects are in Travis County?")
         has_specific_county = isinstance(filters.get('county'), str) and filters.get('county')
 
-        # Also trigger hard filtering for zone-specific, project-specific, or county-specific queries
-        if (has_specific_zone or has_specific_project or has_specific_county) and not should_hard_filter:
+        # Also trigger hard filtering for zone-specific, project-specific, county-specific, or project comparison queries
+        if (has_specific_zone or has_specific_project or has_specific_county or has_project_comparison) and not should_hard_filter:
             should_hard_filter = hasattr(retriever, 'search_with_hard_filters')
 
         if should_hard_filter:
@@ -479,6 +481,8 @@ def create_comparative_filter_hook(
         if hard_filter_clause and hasattr(retriever, 'search_with_hard_filters'):
             if has_specific_inr:
                 filter_type = "INR lookup"
+            elif has_project_comparison:
+                filter_type = "project comparison (multi-project)"
             elif has_specific_project:
                 filter_type = "project name filter"
             elif has_specific_zone:
@@ -493,6 +497,13 @@ def create_comparative_filter_hook(
                 where=hard_filter_clause,
                 k=k_total
             )
+            # FALLBACK: If hard filter returns empty, try semantic search without filter
+            # This fixes project name queries where metadata might not match exactly
+            if not docs:
+                logger.warning(f"Hard filter returned empty for {filter_type}, falling back to semantic search")
+                docs = retriever.invoke(query)
+                if docs:
+                    logger.success(f"Semantic search fallback retrieved {len(docs)} documents")
         else:
             docs = retriever.invoke(query)
 
