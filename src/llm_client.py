@@ -29,7 +29,8 @@ def call_llm_api(prompt_text: str) -> Generator[str, None, None]:
         "prompt": prompt_text,
         "stream": True,
         "num_predict": 4096,     # Ollama parameter - increased to 4096 for complex comparative queries
-        "temperature": 0.1       # Consensus: Low for factual RAG, not 0.0 (repetition risk)
+        "temperature": 0.1,      # Low for factual RAG
+        "seed": 42               # Fixed seed for reproducible outputs
     }
 
     try:
