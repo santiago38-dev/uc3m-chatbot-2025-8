@@ -28,7 +28,7 @@ def call_llm_api(prompt_text: str) -> Generator[str, None, None]:
         "model": "llama3.1:8b",
         "prompt": prompt_text,
         "stream": True,
-        "max_tokens": 2048,      # Increased: 1024 was truncating comparative answers
+        "num_predict": 2048,     # Ollama parameter (not max_tokens!) - increased from default to prevent truncation
         "temperature": 0.1       # Consensus: Low for factual RAG, not 0.0 (repetition risk)
     }
 
