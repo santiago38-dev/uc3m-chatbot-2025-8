@@ -352,9 +352,14 @@ Formato ejemplo:
     "COMPARATIVE": {
         "en": """RESPONSE FORMAT FOR COMPARATIVE QUESTION:
 1. Start with a summary statement of the comparison result
-2. Present a structured comparison (use table or bullet points):
-   | Aspect | Entity A | Entity B |
-   |--------|----------|----------|
+2. Present a structured comparison using BULLET POINTS (NOT tables):
+   **Entity A:**
+   - Aspect 1: [value] [Source N]
+   - Aspect 2: [value] [Source N]
+
+   **Entity B:**
+   - Aspect 1: [value] [Source N]
+   - Aspect 2: [value] [Source N]
 
 **IMPORTANT: When comparing PROJECTS, ALWAYS include these key attributes first:**
    - Project Company (owner)
@@ -368,9 +373,14 @@ Formato ejemplo:
 
         "es": """FORMATO PARA PREGUNTA COMPARATIVA:
 1. Comienza con un resumen del resultado de la comparación
-2. Presenta una comparación estructurada (tabla o viñetas):
-   | Aspecto | Entidad A | Entidad B |
-   |---------|-----------|-----------|
+2. Presenta una comparación estructurada usando VIÑETAS (NO tablas):
+   **Entidad A:**
+   - Aspecto 1: [valor] [Fuente N]
+   - Aspecto 2: [valor] [Fuente N]
+
+   **Entidad B:**
+   - Aspecto 1: [valor] [Fuente N]
+   - Aspecto 2: [valor] [Fuente N]
 
 **IMPORTANTE: Al comparar PROYECTOS, SIEMPRE incluir estos atributos clave primero:**
    - Empresa del Proyecto (propietario)
