@@ -34,13 +34,11 @@ from .components import (
     classify_query, deduplicate_docs_by_inr, get_unique_projects_from_docs
 )
 from .attribution_validator import (
-    validate_developer_attributions,
     check_missing_entities,
     generate_attribution_warning,
     get_entities_in_docs,
     create_grounding_context
 )
-from .alias_expander import get_canonical_parent
 
 # Default analytics path
 DEFAULT_ANALYTICS_PATH = "data/corpus_analytics.json"
