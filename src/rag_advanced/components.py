@@ -955,6 +955,19 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         (isinstance(regex_filters.get('project_name'), str) and regex_filters.get('project_name'))
     )
 
+    # Check for single-developer queries (e.g., "What are the RWE SGIA terms?")
+    # This is different from comparative (list) queries like "RWE vs SAMSUNG"
+    has_specific_developer = (
+        (isinstance(extracted_filters.get('parent_company'), str) and extracted_filters.get('parent_company')) or
+        (isinstance(regex_filters.get('parent_company'), str) and regex_filters.get('parent_company'))
+    )
+
+    # Check for single-TSP queries (e.g., "What are the Oncor interconnection requirements?")
+    has_specific_tsp = (
+        (isinstance(extracted_filters.get('tsp_normalized'), str) and extracted_filters.get('tsp_normalized')) or
+        (isinstance(regex_filters.get('tsp_normalized'), str) and regex_filters.get('tsp_normalized'))
+    )
+
     # Detect if this is a project comparison query (mentions "compare", "vs", "versus" with project names)
     is_project_comparison = bool(re.search(r'\b(compare|vs\.?|versus)\b', question.lower()))
 
@@ -1025,12 +1038,12 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
 
     logger.info(f"Retrieval strategy: {num_queries} queries, limit {k_per_query} docs per query (Total budget: {max_docs})")
 
-    # Use hard filtering for comparative queries, INR lookups, zone-specific, project-specific, or county-specific queries
-    # NOTE: is_comparative is set in chain.py for parent_company and tsp_normalized comparisons
+    # Use hard filtering for comparative queries, INR lookups, zone-specific, project-specific, county-specific, developer-specific, or tsp-specific queries
+    # NOTE: is_comparative is set in chain.py for parent_company and tsp_normalized comparisons (list values)
     # For project comparison queries (Q13), we NOW use hard filtering with multi-project $in filter
     use_project_filter = has_specific_project and not is_project_comparison
     use_comparison_filter = comparison_projects and is_project_comparison  # NEW: use hard filter for project comparisons
-    should_hard_filter = (is_comparative or has_specific_inr or has_specific_zone or has_specific_county or use_project_filter or use_comparison_filter) and where_clause and hasattr(retriever, 'search_with_hard_filters')
+    should_hard_filter = (is_comparative or has_specific_inr or has_specific_zone or has_specific_county or use_project_filter or use_comparison_filter or has_specific_developer or has_specific_tsp) and where_clause and hasattr(retriever, 'search_with_hard_filters')
 
     # Track if we used semantic fallback (entity metadata is unreliable after fallback)
     used_semantic_fallback = False
@@ -1046,6 +1059,10 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
             filter_type = "zone filter"
         elif has_specific_county:
             filter_type = "county filter"
+        elif has_specific_developer:
+            filter_type = "developer filter"
+        elif has_specific_tsp:
+            filter_type = "TSP filter"
         else:
             filter_type = "comparative query"
         logger.info(f"Using HARD filtering mode for {filter_type}")

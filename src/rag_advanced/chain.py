@@ -464,8 +464,15 @@ def create_comparative_filter_hook(
         # Check for county-specific queries (e.g., "Which projects are in Travis County?")
         has_specific_county = isinstance(filters.get('county'), str) and filters.get('county')
 
-        # Also trigger hard filtering for zone-specific, project-specific, county-specific, or project comparison queries
-        if (has_specific_zone or has_specific_project or has_specific_county or has_project_comparison) and not should_hard_filter:
+        # Check for single-developer queries (e.g., "What are the RWE SGIA terms?")
+        # This is different from comparative (list) queries like "RWE vs SAMSUNG"
+        has_specific_developer = isinstance(filters.get('parent_company'), str) and filters.get('parent_company')
+
+        # Check for single-TSP queries (e.g., "What are the Oncor interconnection requirements?")
+        has_specific_tsp = isinstance(filters.get('tsp_normalized'), str) and filters.get('tsp_normalized')
+
+        # Also trigger hard filtering for zone-specific, project-specific, county-specific, developer-specific, tsp-specific, or project comparison queries
+        if (has_specific_zone or has_specific_project or has_specific_county or has_project_comparison or has_specific_developer or has_specific_tsp) and not should_hard_filter:
             should_hard_filter = hasattr(retriever, 'search_with_hard_filters')
 
         if should_hard_filter:
@@ -499,6 +506,10 @@ def create_comparative_filter_hook(
                 filter_type = "zone filter"
             elif has_specific_county:
                 filter_type = "county filter"
+            elif has_specific_developer:
+                filter_type = "developer filter"
+            elif has_specific_tsp:
+                filter_type = "TSP filter"
             else:
                 filter_type = "comparative query"
             logger.info(f"Using HARD filtering mode for {filter_type}")
