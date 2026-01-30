@@ -253,6 +253,29 @@ def is_domain_relevant(question: str, chat_history: list = None, threshold: floa
     logger = get_logger()
     logger.step("Checking if question is in ERCOT domain...")
 
+    # BYPASS: Auto-approve queries with obvious ERCOT/energy terms
+    # This prevents the LLM from rejecting valid queries about project names it doesn't know
+    bypass_patterns = [
+        # Energy terms
+        r'\b(bess|solar|wind|battery|storage|interconnection|mw|kw|megawatt|kilowatt)\b',
+        # Financial terms
+        r'\b(security deposit|security amount|inr\d|per kw|\$/kw|credit support)\b',
+        # Legal/contractual terms
+        r'\b(force majeure|cure period|termination|material breach|sgia|agreement)\b',
+        # TSP names
+        r'\b(oncor|centerpoint|aep|tnmp|lcra|austin energy)\b',
+        # Developer names
+        r'\b(rwe|samsung|nextera|invenergy|enel|intersect|plus power|pattern)\b',
+        # Zone names
+        r'\b(ercot|coast|north|south|west|panhandle)\b',
+    ]
+
+    question_lower = question.lower()
+    for pattern in bypass_patterns:
+        if re.search(pattern, question_lower):
+            logger.success(f"Domain check BYPASSED - query contains ERCOT terms")
+            return True
+
     # Build chat context string if history exists
     chat_context = ""
     if chat_history:
