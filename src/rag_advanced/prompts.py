@@ -351,46 +351,61 @@ Formato ejemplo:
 
     "COMPARATIVE": {
         "en": """RESPONSE FORMAT FOR COMPARATIVE QUESTION:
-1. Start with a summary statement of the comparison result
-2. Present a structured comparison using BULLET POINTS (NOT tables):
-   **Entity A:**
-   - Aspect 1: [value] [Source N]
-   - Aspect 2: [value] [Source N]
 
-   **Entity B:**
-   - Aspect 1: [value] [Source N]
-   - Aspect 2: [value] [Source N]
+**CRITICAL: Answer the ACTUAL question asked. Do NOT just list project metadata.**
 
-**IMPORTANT: When comparing PROJECTS, ALWAYS include these key attributes first:**
-   - Project Company (owner)
-   - Capacity (MW)
-   - Location/Zone (e.g., WEST Texas, COAST, NORTH)
-   - TSP (e.g., ONCOR, CENTERPOINT, AEP)
-   - Security Amount (total $ and $/kW)
+1. Identify what is being compared:
+   - If comparing PROJECTS (e.g., "Project A vs Project B"): Include project attributes (capacity, location, security amount)
+   - If comparing TSPs/DEVELOPERS requirements or policies (e.g., "ONCOR vs CenterPoint requirements"): Compare their POLICIES, SPECIFICATIONS, PROCESSES - NOT individual project data
 
-3. Highlight key differences and cite sources for each data point
-4. Conclude with the main takeaway""",
+2. For TSP/DEVELOPER POLICY comparisons, compare aspects like:
+   - Technical specifications and standards referenced
+   - Security deposit requirements ($/MW rates, formulas)
+   - Interconnection process requirements
+   - Timeline and milestone requirements
+   - Insurance and liability requirements
+   - Default and cure period terms
+
+3. Present a structured comparison using BULLET POINTS:
+   **[Entity A Name]:**
+   - [Relevant aspect from question]: [value] [Source N]
+   - [Relevant aspect from question]: [value] [Source N]
+
+   **[Entity B Name]:**
+   - [Same aspects for comparison]: [value] [Source N]
+
+4. For PROJECT comparisons ONLY, include: Project Company, Capacity (MW), Location/Zone, TSP, Security Amount
+
+5. Highlight key differences and cite sources
+6. Conclude with the main takeaway that ANSWERS THE QUESTION""",
 
         "es": """FORMATO PARA PREGUNTA COMPARATIVA:
-1. Comienza con un resumen del resultado de la comparación
-2. Presenta una comparación estructurada usando VIÑETAS (NO tablas):
-   **Entidad A:**
-   - Aspecto 1: [valor] [Fuente N]
-   - Aspecto 2: [valor] [Fuente N]
 
-   **Entidad B:**
-   - Aspecto 1: [valor] [Fuente N]
-   - Aspecto 2: [valor] [Fuente N]
+**CRÍTICO: Responde la pregunta REAL. NO solo listes metadatos de proyectos.**
 
-**IMPORTANTE: Al comparar PROYECTOS, SIEMPRE incluir estos atributos clave primero:**
-   - Empresa del Proyecto (propietario)
-   - Capacidad (MW)
-   - Ubicación/Zona (ej. WEST Texas, COAST, NORTH)
-   - TSP (ej. ONCOR, CENTERPOINT, AEP)
-   - Monto de Seguridad (total $ y $/kW)
+1. Identifica qué se está comparando:
+   - Si se comparan PROYECTOS (ej. "Proyecto A vs Proyecto B"): Incluir atributos del proyecto
+   - Si se comparan requisitos de TSPs/DESARROLLADORES (ej. "ONCOR vs CenterPoint requisitos"): Comparar POLÍTICAS, ESPECIFICACIONES, PROCESOS - NO datos de proyectos individuales
 
-3. Destaca diferencias clave y cita fuentes para cada dato
-4. Concluye con la conclusión principal"""
+2. Para comparaciones de POLÍTICAS de TSP/DESARROLLADOR, comparar:
+   - Especificaciones técnicas y estándares referenciados
+   - Requisitos de depósito de seguridad ($/MW, fórmulas)
+   - Requisitos del proceso de interconexión
+   - Requisitos de cronograma e hitos
+   - Requisitos de seguro y responsabilidad
+   - Términos de incumplimiento y períodos de subsanación
+
+3. Presenta comparación estructurada usando VIÑETAS:
+   **[Nombre Entidad A]:**
+   - [Aspecto relevante de la pregunta]: [valor] [Fuente N]
+
+   **[Nombre Entidad B]:**
+   - [Mismos aspectos para comparar]: [valor] [Fuente N]
+
+4. Solo para comparaciones de PROYECTOS: incluir Empresa, Capacidad (MW), Ubicación, TSP, Monto de Seguridad
+
+5. Destaca diferencias clave y cita fuentes
+6. Concluye con la conclusión que RESPONDE LA PREGUNTA"""
     },
 
     "AGGREGATION": {
