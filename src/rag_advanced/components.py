@@ -930,8 +930,13 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     has_specific_zone = isinstance(extracted_filters.get('zone'), str) and extracted_filters.get('zone')
     has_specific_county = isinstance(extracted_filters.get('county'), str) and extracted_filters.get('county')
 
-    # Check for project_name from LLM extraction (Q17: "What is the security deposit for Quantum Storage?")
-    has_specific_project = isinstance(metadata_filters.get('project_name'), str) and metadata_filters.get('project_name')
+    # Check for project_name from LLM extraction OR regex extraction
+    # Q17: "What is the security deposit for Quantum Storage?"
+    has_specific_project = (
+        (isinstance(metadata_filters.get('project_name'), str) and metadata_filters.get('project_name')) or
+        (isinstance(extracted_filters.get('project_name'), str) and extracted_filters.get('project_name')) or
+        (isinstance(regex_filters.get('project_name'), str) and regex_filters.get('project_name'))
+    )
 
     # Detect if this is a project comparison query (mentions "compare", "vs", "versus" with project names)
     is_project_comparison = bool(re.search(r'\b(compare|vs\.?|versus)\b', question.lower()))
@@ -957,8 +962,16 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         logger.info(f"Project comparison filter: searching for {unique_variations}")
     elif has_specific_project and not is_project_comparison:
         # Single project lookup (Q17)
-        combined_filters['project_name'] = metadata_filters['project_name']
-        logger.info(f"LLM extracted project_name for hard filter: {metadata_filters['project_name']}")
+        # Prefer regex extraction, then extracted_filters, then LLM metadata
+        if isinstance(regex_filters.get('project_name'), str) and regex_filters.get('project_name'):
+            combined_filters['project_name'] = regex_filters['project_name']
+            logger.info(f"Regex extracted project_name for hard filter: {regex_filters['project_name']}")
+        elif isinstance(extracted_filters.get('project_name'), str) and extracted_filters.get('project_name'):
+            combined_filters['project_name'] = extracted_filters['project_name']
+            logger.info(f"Extracted filters project_name for hard filter: {extracted_filters['project_name']}")
+        elif isinstance(metadata_filters.get('project_name'), str) and metadata_filters.get('project_name'):
+            combined_filters['project_name'] = metadata_filters['project_name']
+            logger.info(f"LLM extracted project_name for hard filter: {metadata_filters['project_name']}")
 
     if combined_filters:
         # Build safe where clause excluding fuel_type from hard filtering
