@@ -295,7 +295,6 @@ def is_domain_relevant(question: str, chat_history: list = None, threshold: floa
         result = call_llm_api_full(prompt).strip()
         logger.info(f"Domain check raw response: {result[:50]}...")
         # Extract number from response
-        import re
         numbers = re.findall(r'\d+', result)
         if numbers:
             confidence = int(numbers[0]) / 100.0
