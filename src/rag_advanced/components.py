@@ -925,10 +925,21 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # 5. Build hard filter for comparative, INR, zone, project_name, and county queries
     # NOTE: Only hard filter on parent_company, tsp_normalized, inr, zone, project_name, county
     # fuel_type has too many null values in the corpus, causing empty results
+    # IMPORTANT: Check BOTH extracted_filters (from original question) AND regex_filters (from reformulated question)
+    # This handles follow-up queries where the reformulated question has different entities
     where_clause = None
-    has_specific_inr = isinstance(extracted_filters.get('inr'), str) and extracted_filters.get('inr')
-    has_specific_zone = isinstance(extracted_filters.get('zone'), str) and extracted_filters.get('zone')
-    has_specific_county = isinstance(extracted_filters.get('county'), str) and extracted_filters.get('county')
+    has_specific_inr = (
+        (isinstance(extracted_filters.get('inr'), str) and extracted_filters.get('inr')) or
+        (isinstance(regex_filters.get('inr'), str) and regex_filters.get('inr'))
+    )
+    has_specific_zone = (
+        (isinstance(extracted_filters.get('zone'), str) and extracted_filters.get('zone')) or
+        (isinstance(regex_filters.get('zone'), str) and regex_filters.get('zone'))
+    )
+    has_specific_county = (
+        (isinstance(extracted_filters.get('county'), str) and extracted_filters.get('county')) or
+        (isinstance(regex_filters.get('county'), str) and regex_filters.get('county'))
+    )
 
     # Check for project_name from LLM extraction OR regex extraction
     # Q17: "What is the security deposit for Quantum Storage?"
@@ -941,8 +952,16 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     # Detect if this is a project comparison query (mentions "compare", "vs", "versus" with project names)
     is_project_comparison = bool(re.search(r'\b(compare|vs\.?|versus)\b', question.lower()))
 
-    # Merge project_name from LLM extraction into extracted_filters for hard filtering
+    # Merge filters from extracted_filters AND regex_filters for hard filtering
+    # regex_filters may have values from reformulated question that extracted_filters doesn't have
     combined_filters = dict(extracted_filters) if extracted_filters else {}
+
+    # Merge inr, zone, county from regex_filters if not already in combined_filters
+    for key in ('inr', 'zone', 'county', 'parent_company', 'tsp_normalized'):
+        if key not in combined_filters or not combined_filters.get(key):
+            if regex_filters.get(key):
+                combined_filters[key] = regex_filters[key]
+                logger.info(f"Merged {key} from regex_filters: {regex_filters[key]}")
 
     # For project comparison queries (Q13), build multi-project filter with $in
     if comparison_projects and is_project_comparison:
