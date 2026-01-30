@@ -73,6 +73,12 @@ ENTITY_PATTERNS = [
     r'\bsgia\b',  # Specific agreement reference
     r'\b(samsung|intersect|rwe|nextera|invenergy|enel|pattern|terra-?gen|longroad|savion)\b',  # Known developers
     r'\b(oncor|centerpoint|aep|tnmp|lcra|austin energy)\b',  # Known TSPs (specific mention)
+    # Project names: Capitalized name + energy suffix (e.g., "Champaign BESS", "Quantum Storage")
+    r'\b[A-Z][a-z]+\s+(?:BESS|Storage|Solar|Wind|Energy|Farm|Plant|Battery)\b',
+    # Multi-word project names (e.g., "Blue Ridge Wind", "San Antonio Solar")
+    r'\b[A-Z][a-z]+\s+[A-Z][a-z]+\s+(?:BESS|Storage|Solar|Wind|Energy|Farm|Plant|Battery)\b',
+    # Projects ending with "Energy Storage" (e.g., "Headcamp Energy Storage")
+    r'\b[A-Z][a-z]+\s+Energy\s+Storage\b',
 ]
 
 
