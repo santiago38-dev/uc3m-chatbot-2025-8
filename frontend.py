@@ -95,7 +95,7 @@ def show_document(project, inr, section):
     st.markdown(html_block, unsafe_allow_html=True)
 
 
-st.set_page_config(page_title="SGIA Intelligence", page_icon="⚡", layout="centered")
+st.set_page_config(page_title="LGIA Intelligence", page_icon="⚡", layout="centered")
 
 
 def file_hash(path: str) -> str:
@@ -139,7 +139,7 @@ def load_chain(k_docs: int, mode: str, with_summary: bool, _version: str):
     return chain, retriever
 
 
-st.title("⚡ SGIA Intelligence")
+st.title("⚡ LGIA Intelligence")
 st.caption("133 Texas Interconnection Agreements")
 
 
