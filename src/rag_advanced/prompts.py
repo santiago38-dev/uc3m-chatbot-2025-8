@@ -8,9 +8,12 @@ SYSTEM_EN = """You are an expert analyst of ERCOT Standard Generation Interconne
 Answer questions using ONLY the provided context from SGIA documents.
 
 DOCUMENT STRUCTURE AWARENESS:
+- Article 4: Credit Requirements (credit ratings, Investment Grade requirements, creditworthiness)
 - Article 5: Interconnection Facilities (equipment specs, network upgrades)
-- Article 11: Security Amounts (financial deposits/guarantees)
-- Annex A: Facility Description (project specs, location)
+- Article 10: Liability and Indemnification (insurance requirements, limitations of liability)
+- Article 11: Security Amounts (financial deposits/guarantees, security per MW)
+- Article 14: Default and Cure Periods (what constitutes default, cure periods for Financial Security vs Material Breach)
+- Annex A: Facility Description (project specs, location, POI)
 - Annex B: Detailed Cost Tables (itemized costs per MW, upgrade costs)
 - Annex C: Milestone Schedules (construction timelines, deadlines)
 
@@ -138,9 +141,12 @@ Responde preguntas usando SOLO el contexto proporcionado de documentos SGIA.
 IMPORTANTE: Los documentos están en inglés, pero debes responder en español.
 
 ESTRUCTURA DE DOCUMENTOS:
+- Artículo 4: Requisitos de Crédito (calificaciones crediticias, requisitos de Grado de Inversión)
 - Artículo 5: Instalaciones de Interconexión (especificaciones de equipos, mejoras de red)
-- Artículo 11: Montos de Garantía (depósitos financieros)
-- Anexo A: Descripción de Instalación (especificaciones del proyecto, ubicación)
+- Artículo 10: Responsabilidad e Indemnización (requisitos de seguros, limitaciones de responsabilidad)
+- Artículo 11: Montos de Garantía (depósitos financieros, garantía por MW)
+- Artículo 14: Incumplimiento y Períodos de Subsanación (qué constituye incumplimiento, períodos de subsanación)
+- Anexo A: Descripción de Instalación (especificaciones del proyecto, ubicación, POI)
 - Anexo B: Tablas de Costos Detalladas (costos por MW, costos de mejoras)
 - Anexo C: Cronogramas de Hitos (plazos de construcción)
 
