@@ -259,25 +259,60 @@ def normalize_project_name_for_search(name: str) -> List[str]:
     """
     Generate variations of a project name for fuzzy matching.
 
+    "Champaign BESS" ->
+        ["Champaign BESS", "Champaign", "Champaign Battery", "Champaign Storage",
+         "Champaign Energy Storage", "Champaign Battery Energy Storage"]
+
     "Headcamp Energy Storage Plant" ->
         ["Headcamp Energy Storage Plant", "Headcamp", "Headcamp Energy", "Headcamp Storage"]
     """
     variations = [name]
+    seen = {name.lower()}  # Track lowercase to avoid duplicates
+
+    def add_variation(v: str):
+        v = v.strip()
+        if v and v.lower() not in seen:
+            seen.add(v.lower())
+            variations.append(v)
 
     # Add first word as variation (often the unique identifier)
     words = name.split()
     if len(words) > 1:
-        variations.append(words[0])
+        add_variation(words[0])
         # Add first two words
         if len(words) > 2:
-            variations.append(' '.join(words[:2]))
+            add_variation(' '.join(words[:2]))
 
-    # Remove common suffixes and add as variation
-    for suffix in ['Energy Storage Plant', 'Storage Plant', 'Storage', 'Plant', 'Solar', 'Wind', 'BESS', 'Farm', 'Project', 'Energy']:
-        if name.endswith(suffix) and name != suffix:
+    # Remove common suffixes and add base as variation
+    common_suffixes = [
+        'Battery Energy Storage System', 'Energy Storage System', 'Energy Storage Plant',
+        'Battery Energy Storage', 'Storage Plant', 'Storage System', 'Energy Storage',
+        'Storage', 'Plant', 'Solar', 'Wind', 'BESS', 'Farm', 'Project', 'Energy', 'Battery'
+    ]
+    base_name = None
+    for suffix in common_suffixes:
+        if name.lower().endswith(suffix.lower()) and name.lower() != suffix.lower():
             base = name[:-len(suffix)].strip()
-            if base and base not in variations:
-                variations.append(base)
+            if base:
+                add_variation(base)
+                if base_name is None:
+                    base_name = base
+
+    # If we found a base name (e.g., "Champaign" from "Champaign BESS"),
+    # generate common suffix variations
+    if base_name:
+        storage_suffixes = [
+            'BESS', 'Battery', 'Storage', 'Energy Storage', 'Battery Storage',
+            'Battery Energy Storage', 'Energy Storage System'
+        ]
+        for suffix in storage_suffixes:
+            add_variation(f"{base_name} {suffix}")
+
+    # Also handle case where name might be partial (just "Champaign")
+    # Add common storage suffixes
+    if len(words) == 1:
+        for suffix in ['BESS', 'Battery', 'Storage', 'Energy Storage', 'Solar', 'Wind']:
+            add_variation(f"{name} {suffix}")
 
     return variations
 

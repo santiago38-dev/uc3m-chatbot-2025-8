@@ -982,15 +982,25 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
     elif has_specific_project and not is_project_comparison:
         # Single project lookup (Q17)
         # Prefer regex extraction, then extracted_filters, then LLM metadata
+        # CRITICAL FIX: Generate name variations for fuzzy matching (same as comparison queries)
+        # This handles cases where ChromaDB has a different name format
+        project_name = None
         if isinstance(regex_filters.get('project_name'), str) and regex_filters.get('project_name'):
-            combined_filters['project_name'] = regex_filters['project_name']
-            logger.info(f"Regex extracted project_name for hard filter: {regex_filters['project_name']}")
+            project_name = regex_filters['project_name']
+            logger.info(f"Regex extracted project_name: {project_name}")
         elif isinstance(extracted_filters.get('project_name'), str) and extracted_filters.get('project_name'):
-            combined_filters['project_name'] = extracted_filters['project_name']
-            logger.info(f"Extracted filters project_name for hard filter: {extracted_filters['project_name']}")
+            project_name = extracted_filters['project_name']
+            logger.info(f"Extracted filters project_name: {project_name}")
         elif isinstance(metadata_filters.get('project_name'), str) and metadata_filters.get('project_name'):
-            combined_filters['project_name'] = metadata_filters['project_name']
-            logger.info(f"LLM extracted project_name for hard filter: {metadata_filters['project_name']}")
+            project_name = metadata_filters['project_name']
+            logger.info(f"LLM extracted project_name: {project_name}")
+
+        if project_name:
+            # Generate variations for fuzzy matching (e.g., "Champaign BESS" ->
+            # ["Champaign BESS", "Champaign", "Champaign Battery Energy Storage", ...])
+            variations = normalize_project_name_for_search(project_name)
+            combined_filters['project_name'] = variations
+            logger.info(f"Project name variations for fuzzy match: {variations}")
 
     if combined_filters:
         # Build safe where clause excluding fuel_type from hard filtering
@@ -1036,11 +1046,24 @@ def generate_thinking_response(input_dict: Dict, retriever, k_total: int = None)
         # For hard filtering, we retrieve with the filter applied
         all_docs = retriever.search_with_hard_filters(question, where=where_clause, k=max_docs)
 
-        # FALLBACK: If hard filter returns empty, try semantic search without filter
+        # FALLBACK: If hard filter returns empty, try semantic search with soft boosting
         # This fixes Q3, Q5, Q14 comparative queries that fail hard filtering
         if not all_docs:
-            logger.warning(f"Hard filter returned empty for {filter_type}, falling back to semantic search")
-            all_docs = retriever.invoke(question)
+            logger.warning(f"Hard filter returned empty for {filter_type}, falling back to semantic search with boosting")
+            # Pass original filters (with single values) for boosting
+            # Prefer regex_filters as they're more reliable, fallback to extracted_filters
+            boost_filters = {}
+            for k in ('project_name', 'parent_company', 'tsp_normalized', 'zone', 'county'):
+                # Get single string values for boosting (not lists)
+                if isinstance(regex_filters.get(k), str) and regex_filters.get(k):
+                    boost_filters[k] = regex_filters[k]
+                elif isinstance(extracted_filters.get(k), str) and extracted_filters.get(k):
+                    boost_filters[k] = extracted_filters[k]
+
+            if boost_filters and hasattr(retriever, 'search_with_filters'):
+                all_docs = retriever.search_with_filters(question, filters=boost_filters)
+            else:
+                all_docs = retriever.invoke(question)
             used_semantic_fallback = True  # Mark that we used fallback
             if all_docs:
                 logger.success(f"Semantic search fallback retrieved {len(all_docs)} documents")

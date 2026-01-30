@@ -22,7 +22,8 @@ from src.chat_history import get_session_history
 from src.llm_client import call_llm_api_full
 from .filter_utils import (
     extract_multi_filters_from_query,
-    build_chromadb_where_clause
+    build_chromadb_where_clause,
+    normalize_project_name_for_search
 )
 from .utils import (
     get_logger, detect_language, format_sources, RAGMode, config
@@ -473,6 +474,17 @@ def create_comparative_filter_hook(
             # NOTE: fuel_type is EXCLUDED because it has too many null values causing empty results
             safe_filters = {k: v for k, v in filters.items()
                           if k in ('parent_company', 'tsp_normalized', 'inr', 'zone', 'project_name', 'county')}
+
+            # CRITICAL FIX: For single project name queries, generate name variations
+            # This handles cases where ChromaDB has a different name format (e.g.,
+            # "Champaign Battery Energy Storage System" vs "Champaign BESS")
+            if has_specific_project and 'project_name' in safe_filters:
+                original_name = safe_filters['project_name']
+                variations = normalize_project_name_for_search(original_name)
+                # Use $in with variations instead of $eq with exact match
+                safe_filters['project_name'] = variations
+                logger.info(f"Project name variations for fuzzy match: {variations}")
+
             if safe_filters:
                 hard_filter_clause = build_chromadb_where_clause(safe_filters, expand_aliases=True)
 
@@ -495,11 +507,20 @@ def create_comparative_filter_hook(
                 where=hard_filter_clause,
                 k=k_total
             )
-            # FALLBACK: If hard filter returns empty, try semantic search without filter
+            # FALLBACK: If hard filter returns empty, try semantic search with soft boosting
             # This fixes project name queries where metadata might not match exactly
+            # Use search_with_filters to apply boosting based on extracted filters
             if not docs:
-                logger.warning(f"Hard filter returned empty for {filter_type}, falling back to semantic search")
-                docs = retriever.invoke(query)
+                logger.warning(f"Hard filter returned empty for {filter_type}, falling back to semantic search with boosting")
+                # Pass original filters (with single project name, not variations) for boosting
+                # The boosting will prioritize documents matching the project name
+                boost_filters = {k: v for k, v in filters.items()
+                               if k in ('project_name', 'parent_company', 'tsp_normalized', 'zone', 'county')
+                               and isinstance(v, str)}  # Only single values for boosting
+                if boost_filters and hasattr(retriever, 'search_with_filters'):
+                    docs = retriever.search_with_filters(query, filters=boost_filters)
+                else:
+                    docs = retriever.invoke(query)
                 if docs:
                     logger.success(f"Semantic search fallback retrieved {len(docs)} documents")
         else:

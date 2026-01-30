@@ -170,11 +170,26 @@ def similarity_search_with_boost(
 
         # Check metadata matches
         for key, val in filters.items():
-            if doc.metadata.get(key) == val:
+            doc_val = doc.metadata.get(key)
+            if doc_val == val:
                 match_count += 1
                 # SPECIAL CASE: Project Name match gets massive boost
                 if key == 'project_name':
                      match_count += 10 # Artificially inflate match count to prioritize project matches above all else
+            # SPECIAL CASE: Partial matching for project_name
+            # E.g., "Champaign BESS" should match "Champaign Battery Energy Storage System"
+            elif key == 'project_name' and doc_val and val:
+                doc_val_lower = str(doc_val).lower()
+                val_lower = str(val).lower()
+                # Check if the filter value's first word appears in the document's project name
+                # This handles cases like "Champaign" matching "Champaign Battery Energy Storage"
+                first_word = val_lower.split()[0] if val_lower else ''
+                if first_word and first_word in doc_val_lower:
+                    match_count += 8  # Strong boost for partial name match
+                # Also check if the document's first word matches the filter's first word
+                doc_first_word = doc_val_lower.split()[0] if doc_val_lower else ''
+                if doc_first_word == first_word and first_word:
+                    match_count += 10  # Massive boost for first-word exact match
 
         # Apply boost if there's a match (lower distance is better)
         if match_count > 0:
