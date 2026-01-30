@@ -460,16 +460,19 @@ def create_comparative_filter_hook(
         # Check for project_name queries (e.g., "What is the security deposit for Champaign BESS?")
         has_specific_project = isinstance(filters.get('project_name'), str) and filters.get('project_name')
 
-        # Also trigger hard filtering for zone-specific or project-specific queries
-        if (has_specific_zone or has_specific_project) and not should_hard_filter:
+        # Check for county-specific queries (e.g., "Which projects are in Travis County?")
+        has_specific_county = isinstance(filters.get('county'), str) and filters.get('county')
+
+        # Also trigger hard filtering for zone-specific, project-specific, or county-specific queries
+        if (has_specific_zone or has_specific_project or has_specific_county) and not should_hard_filter:
             should_hard_filter = hasattr(retriever, 'search_with_hard_filters')
 
         if should_hard_filter:
-            # Create a where clause with safe fields (parent_company, tsp_normalized, inr, zone, project_name)
-            # NOTE: zone is safe because it has good coverage in metadata
-            # NOTE: project_name added to enable hard filtering for specific project queries
+            # Create a where clause with safe fields
+            # NOTE: zone, project_name, county are safe because they have good coverage in metadata
+            # NOTE: fuel_type is EXCLUDED because it has too many null values causing empty results
             safe_filters = {k: v for k, v in filters.items()
-                          if k in ('parent_company', 'tsp_normalized', 'inr', 'zone', 'project_name')}
+                          if k in ('parent_company', 'tsp_normalized', 'inr', 'zone', 'project_name', 'county')}
             if safe_filters:
                 hard_filter_clause = build_chromadb_where_clause(safe_filters, expand_aliases=True)
 
@@ -480,6 +483,8 @@ def create_comparative_filter_hook(
                 filter_type = "project name filter"
             elif has_specific_zone:
                 filter_type = "zone filter"
+            elif has_specific_county:
+                filter_type = "county filter"
             else:
                 filter_type = "comparative query"
             logger.info(f"Using HARD filtering mode for {filter_type}")

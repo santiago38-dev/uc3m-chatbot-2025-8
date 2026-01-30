@@ -55,10 +55,162 @@ TSP_PATTERNS = {
     'SHARYLAND': r'sharyland',
 }
 
+# Common Texas county patterns (most common for ERCOT projects)
+COUNTY_PATTERNS = [
+    r'travis\s*county',
+    r'brazoria\s*county',
+    r'hidalgo\s*county',
+    r'pecos\s*county',
+    r'reeves\s*county',
+    r'culberson\s*county',
+    r'wharton\s*county',
+    r'matagorda\s*county',
+    r'bee\s*county',
+    r'nueces\s*county',
+    r'cameron\s*county',
+    r'willacy\s*county',
+    r'starr\s*county',
+    r'webb\s*county',
+    r'zapata\s*county',
+    r'kenedy\s*county',
+    r'kleberg\s*county',
+    r'jim\s*wells\s*county',
+    r'live\s*oak\s*county',
+    r'mcmullen\s*county',
+    r'la\s*salle\s*county',
+    r'dimmit\s*county',
+    r'maverick\s*county',
+    r'zavala\s*county',
+    r'frio\s*county',
+    r'atascosa\s*county',
+    r'wilson\s*county',
+    r'karnes\s*county',
+    r'goliad\s*county',
+    r'victoria\s*county',
+    r'calhoun\s*county',
+    r'jackson\s*county',
+    r'lavaca\s*county',
+    r'dewitt\s*county',
+    r'gonzales\s*county',
+    r'guadalupe\s*county',
+    r'comal\s*county',
+    r'hays\s*county',
+    r'caldwell\s*county',
+    r'bastrop\s*county',
+    r'lee\s*county',
+    r'burleson\s*county',
+    r'brazos\s*county',
+    r'robertson\s*county',
+    r'milam\s*county',
+    r'williamson\s*county',
+    r'bell\s*county',
+    r'falls\s*county',
+    r'mclennan\s*county',
+    r'coryell\s*county',
+    r'hamilton\s*county',
+    r'lampasas\s*county',
+    r'burnet\s*county',
+    r'llano\s*county',
+    r'mason\s*county',
+    r'kimble\s*county',
+    r'kerr\s*county',
+    r'bandera\s*county',
+    r'medina\s*county',
+    r'bexar\s*county',
+    r'kendall\s*county',
+    r'blanco\s*county',
+    r'gillespie\s*county',
+    r'real\s*county',
+    r'uvalde\s*county',
+    r'kinney\s*county',
+    r'val\s*verde\s*county',
+    r'edwards\s*county',
+    r'sutton\s*county',
+    r'schleicher\s*county',
+    r'menard\s*county',
+    r'mcculloch\s*county',
+    r'san\s*saba\s*county',
+    r'mills\s*county',
+    r'brown\s*county',
+    r'coleman\s*county',
+    r'runnels\s*county',
+    r'tom\s*green\s*county',
+    r'concho\s*county',
+    r'irion\s*county',
+    r'crockett\s*county',
+    r'terrell\s*county',
+    r'brewster\s*county',
+    r'presidio\s*county',
+    r'jeff\s*davis\s*county',
+    r'hudspeth\s*county',
+    r'el\s*paso\s*county',
+]
+
+# Project name suffixes for extraction
+PROJECT_SUFFIXES = [
+    'BESS', 'Battery', 'Storage', 'Solar', 'Wind', 'Energy Storage',
+    'Energy Storage Plant', 'Plant', 'Farm', 'Project', 'Generation',
+    'Power', 'Facility', 'Station'
+]
+
 
 # =============================================================================
-# PROJECT NAME EXTRACTION (for comparative queries like Q13)
+# PROJECT NAME EXTRACTION
 # =============================================================================
+
+def extract_single_project_name(query: str) -> Optional[str]:
+    """
+    Extract a single project name from a query (non-comparison).
+
+    Examples:
+        "What is the security deposit for Champaign BESS?" -> "Champaign BESS"
+        "Tell me about Quantum Storage" -> "Quantum Storage"
+        "Mustang Solar project details" -> "Mustang Solar"
+        "security for 'Headcamp Energy Storage Plant'" -> "Headcamp Energy Storage Plant"
+
+    Returns:
+        Project name if found, None otherwise
+    """
+    # Pattern 1: Quoted project name (single or double quotes)
+    quoted = re.search(r'["\']([^"\']+(?:BESS|Storage|Solar|Wind|Plant|Farm|Project|Energy))["\']', query, re.IGNORECASE)
+    if quoted:
+        return quoted.group(1).strip()
+
+    # Pattern 2: "for X BESS/Storage/Solar/etc" - most common pattern
+    # e.g., "security deposit for Champaign BESS"
+    for_pattern = re.search(
+        r'\bfor\s+([A-Z][A-Za-z0-9\s]+?(?:BESS|Battery|Storage|Solar|Wind|Energy Storage Plant|Energy Storage|Plant|Farm|Project|Generation|Power|Facility|Station))\b',
+        query
+    )
+    if for_pattern:
+        return for_pattern.group(1).strip()
+
+    # Pattern 3: "about X BESS/Storage/Solar/etc"
+    about_pattern = re.search(
+        r'\babout\s+(?:the\s+)?([A-Z][A-Za-z0-9\s]+?(?:BESS|Battery|Storage|Solar|Wind|Energy Storage Plant|Energy Storage|Plant|Farm|Project|Generation|Power|Facility|Station))\b',
+        query
+    )
+    if about_pattern:
+        return about_pattern.group(1).strip()
+
+    # Pattern 4: "X BESS/Storage terms" or "X Storage's security"
+    suffix_pattern = re.search(
+        r'\b([A-Z][A-Za-z0-9\s]+?(?:BESS|Battery|Storage|Solar|Wind|Energy Storage Plant|Energy Storage|Plant|Farm|Project|Generation|Power|Facility|Station))(?:\'s|\s+terms|\s+security|\s+deposit|\s+agreement|\s+contract|\s+details)',
+        query
+    )
+    if suffix_pattern:
+        return suffix_pattern.group(1).strip()
+
+    # Pattern 5: Just "X BESS" or "X Storage" at start of phrase
+    standalone = re.search(
+        r'\b([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+)*\s+(?:BESS|Battery|Storage|Solar|Wind|Energy Storage Plant|Energy Storage|Plant|Farm|Project))\b',
+        query
+    )
+    if standalone:
+        return standalone.group(1).strip()
+
+    return None
+
 
 def extract_project_names_from_comparison(query: str) -> Optional[List[str]]:
     """
@@ -221,6 +373,30 @@ def extract_multi_filters_from_query(query: str) -> Dict[str, Any]:
     inr_match = re.search(r'\b(\d{2}INR\d{4})\b', query, re.IGNORECASE)
     if inr_match:
         filters['inr'] = inr_match.group(1).upper()
+
+    # === PROJECT NAME ===
+    # For comparative queries, extract multiple project names
+    # For single-project queries, extract the project name for hard filtering
+    if is_comparative:
+        project_names = extract_project_names_from_comparison(query)
+        if project_names:
+            filters['project_name'] = project_names  # List for $in clause
+    else:
+        single_project = extract_single_project_name(query)
+        if single_project:
+            filters['project_name'] = single_project  # String for $eq clause
+
+    # === COUNTY ===
+    # Extract county name for location-based queries
+    for pattern in COUNTY_PATTERNS:
+        county_match = re.search(pattern, q, re.IGNORECASE)
+        if county_match:
+            # Extract just the county name (capitalize properly)
+            matched = county_match.group(0)
+            # Remove "county" suffix and capitalize
+            county_name = re.sub(r'\s*county$', '', matched, flags=re.IGNORECASE).strip().title()
+            filters['county'] = county_name
+            break  # Only take first match
 
     # === NUMERIC FILTERS ===
     # Security per kW threshold (e.g., ">$100/kW", "over $100 per kW")
