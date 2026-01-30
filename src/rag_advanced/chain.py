@@ -457,20 +457,31 @@ def create_comparative_filter_hook(
         # Check for zone-specific queries (Q6: "List all battery projects in West Texas zone")
         has_specific_zone = isinstance(filters.get('zone'), str) and filters.get('zone')
 
-        # Also trigger hard filtering for zone-specific queries
-        if has_specific_zone and not should_hard_filter:
+        # Check for project_name queries (e.g., "What is the security deposit for Champaign BESS?")
+        has_specific_project = isinstance(filters.get('project_name'), str) and filters.get('project_name')
+
+        # Also trigger hard filtering for zone-specific or project-specific queries
+        if (has_specific_zone or has_specific_project) and not should_hard_filter:
             should_hard_filter = hasattr(retriever, 'search_with_hard_filters')
 
         if should_hard_filter:
-            # Create a where clause with safe fields (parent_company, tsp_normalized, inr, zone)
+            # Create a where clause with safe fields (parent_company, tsp_normalized, inr, zone, project_name)
             # NOTE: zone is safe because it has good coverage in metadata
+            # NOTE: project_name added to enable hard filtering for specific project queries
             safe_filters = {k: v for k, v in filters.items()
-                          if k in ('parent_company', 'tsp_normalized', 'inr', 'zone')}
+                          if k in ('parent_company', 'tsp_normalized', 'inr', 'zone', 'project_name')}
             if safe_filters:
                 hard_filter_clause = build_chromadb_where_clause(safe_filters, expand_aliases=True)
 
         if hard_filter_clause and hasattr(retriever, 'search_with_hard_filters'):
-            filter_type = "INR lookup" if has_specific_inr else ("zone filter" if has_specific_zone else "comparative query")
+            if has_specific_inr:
+                filter_type = "INR lookup"
+            elif has_specific_project:
+                filter_type = "project name filter"
+            elif has_specific_zone:
+                filter_type = "zone filter"
+            else:
+                filter_type = "comparative query"
             logger.info(f"Using HARD filtering mode for {filter_type}")
             docs = retriever.search_with_hard_filters(
                 query,
