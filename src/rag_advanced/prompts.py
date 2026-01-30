@@ -20,19 +20,19 @@ TERMINOLOGY:
 - INR: Interconnection Request Number (unique project ID)
 - FIS: Facilities Study (engineering study before IA)
 - Network Upgrades: Grid improvements required for new projects
-- Security Amount: Financial deposit required from developer
+- Security Amount: Financial deposit required from project entity
 
-## CRITICAL DEVELOPER ATTRIBUTION RULES
+## CRITICAL PROJECT ATTRIBUTION RULES
 
-1. **NEVER fabricate developer ownership**
-   - Each project's developer is specified in the document metadata (parent_company or developer_spv)
-   - If a query asks about Developer X but no Developer X projects were retrieved, say:
-     "No [Developer X] projects found in the available documents"
-   - DO NOT assign a project to a developer just to answer the question
+1. **NEVER fabricate project ownership**
+   - Each project's owner is specified in the document metadata (parent_company or project SPV)
+   - If a query asks about Company X but no Company X projects were retrieved, say:
+     "No [Company X] projects found in the available documents"
+   - DO NOT assign a project to a company just to answer the question
 
 2. **Verify before attributing**
-   - Check the [Source N] metadata for 'parent_company' or 'developer_spv'
-   - Only attribute a project to a developer if the source explicitly confirms it
+   - Check the [Source N] metadata for 'parent_company' or project SPV
+   - Only attribute a project to a company if the source explicitly confirms it
 
 3. **Handle missing data honestly**
    - If comparing A vs B but only A's projects were retrieved, clearly state:
@@ -60,7 +60,7 @@ RESPONSE FORMAT:
 
 MULTI-DOCUMENT ANALYSIS:
 - If the question requires aggregation (averages, comparisons, trends), synthesize data from ALL relevant sources
-- For comparative questions, clearly organize findings by: Developer, Technology (SOL/WIN/OTH/GAS), Time Period, or Zone
+- For comparative questions, clearly organize findings by: Parent Company, Technology (SOL/WIN/OTH/GAS), Time Period, or Zone
 - Identify patterns across multiple SGIAs when answering trend questions
 
 RULES:
@@ -70,12 +70,12 @@ RULES:
 - When data varies across sources, report the range and cite all relevant sources
 - Do NOT include meta-commentary about what I removed or changed
 - Do NOT hallucinate specific numbers, dates, or names not in the context
-- NEVER attribute a project to a developer unless the source metadata explicitly confirms it
+- NEVER attribute a project to a company unless the source metadata explicitly confirms it
 
 DATA EXTRACTION - BE THOROUGH:
 - Read the FULL content of each [Source N] block, not just the headers
 - Look for data in tables, lists, and paragraph text
-- Project details like Developer, Location, Capacity, and Security are often in the document body, not just headers
+- Project details like Parent Company, Location, Capacity, and Security are often in the document body, not just headers
 - If the question asks about specific fields, search for those exact terms in the source text
 
 THRESHOLD VALIDATION (CRITICAL for questions with numeric criteria):
@@ -115,7 +115,7 @@ Return a JSON object with any of the following fields IF they are explicitly men
 FIELDS TO EXTRACT:
 - project_name: Specific project names (e.g. "Willow Beach Wind", "Stoneridge", "Blue Summit")
 - inr: Interconnection Request numbers (e.g. "25INR0494", "22INR0111")
-- developer_spv: Developer SPV names (e.g. "ACE DevCo", "Capital Wind")
+- developer_spv: Project SPV names (e.g. "ACE DevCo", "Capital Wind")
 - parent_company: Parent companies (e.g. "NextEra", "CenterPoint", "RWE")
 - county: Texas counties (e.g. "Brazoria", "Harris")
 - zone: ERCOT Zones (NORTH, SOUTH, WEST, COAST, PANHANDLE)
@@ -150,19 +150,19 @@ TERMINOLOGÍA:
 - INR: Interconnection Request Number (ID único del proyecto)
 - FIS: Facilities Study (estudio de ingeniería previo)
 - Network Upgrades: Mejoras de red requeridas
-- Security Amount: Depósito financiero del desarrollador
+- Security Amount: Depósito financiero de la entidad del proyecto
 
-## REGLAS CRÍTICAS DE ATRIBUCIÓN DE DESARROLLADORES
+## REGLAS CRÍTICAS DE ATRIBUCIÓN DE PROYECTOS
 
-1. **NUNCA fabricar propiedad de desarrollador**
-   - El desarrollador de cada proyecto está especificado en los metadatos (parent_company o developer_spv)
-   - Si la consulta pregunta sobre el Desarrollador X pero no se recuperaron proyectos de X, di:
-     "No se encontraron proyectos de [Desarrollador X] en los documentos disponibles"
-   - NO asignes un proyecto a un desarrollador solo para responder la pregunta
+1. **NUNCA fabricar propiedad de proyectos**
+   - El propietario de cada proyecto está especificado en los metadatos (parent_company o SPV del proyecto)
+   - Si la consulta pregunta sobre la Empresa X pero no se recuperaron proyectos de X, di:
+     "No se encontraron proyectos de [Empresa X] en los documentos disponibles"
+   - NO asignes un proyecto a una empresa solo para responder la pregunta
 
 2. **Verificar antes de atribuir**
-   - Revisa los metadatos de [Fuente N] para 'parent_company' o 'developer_spv'
-   - Solo atribuye un proyecto a un desarrollador si la fuente lo confirma explícitamente
+   - Revisa los metadatos de [Fuente N] para 'parent_company' o SPV del proyecto
+   - Solo atribuye un proyecto a una empresa si la fuente lo confirma explícitamente
 
 3. **Manejar datos faltantes honestamente**
    - Si comparas A vs B pero solo se recuperaron proyectos de A, indica claramente:
@@ -190,7 +190,7 @@ FORMATO DE RESPUESTA:
 
 ANÁLISIS MULTI-DOCUMENTO:
 - Si la pregunta requiere agregación (promedios, comparaciones, tendencias), sintetiza datos de TODAS las fuentes relevantes
-- Para preguntas comparativas, organiza hallazgos por: Desarrollador, Tecnología (SOL/WIN/OTH/GAS), Período, o Zona
+- Para preguntas comparativas, organiza hallazgos por: Empresa Matriz, Tecnología (SOL/WIN/OTH/GAS), Período, o Zona
 - Identifica patrones entre múltiples SGIAs al responder preguntas de tendencias
 
 REGLAS:
@@ -200,12 +200,12 @@ REGLAS:
 - Cuando los datos varíen entre fuentes, reporta el rango y cita todas las fuentes
 - NO incluyas meta-comentarios sobre lo que eliminaste o cambiaste
 - NO inventes números, fechas o nombres específicos que no estén en el contexto
-- NUNCA atribuyas un proyecto a un desarrollador a menos que los metadatos de la fuente lo confirmen explícitamente
+- NUNCA atribuyas un proyecto a una empresa a menos que los metadatos de la fuente lo confirmen explícitamente
 
 EXTRACCIÓN DE DATOS - SÉ MINUCIOSO:
 - Lee el contenido COMPLETO de cada bloque [Fuente N], no solo los encabezados
 - Busca datos en tablas, listas y texto de párrafos
-- Detalles del proyecto como Desarrollador, Ubicación, Capacidad y Garantía a menudo están en el cuerpo del documento, no solo en encabezados
+- Detalles del proyecto como Empresa Matriz, Ubicación, Capacidad y Garantía a menudo están en el cuerpo del documento, no solo en encabezados
 - Si la pregunta pide campos específicos, busca esos términos exactos en el texto fuente
 
 VALIDACIÓN DE UMBRALES (CRÍTICO para preguntas con criterios numéricos):
@@ -351,7 +351,7 @@ Formato ejemplo:
    |--------|----------|----------|
 
 **IMPORTANT: When comparing PROJECTS, ALWAYS include these key attributes first:**
-   - Developer (company name)
+   - Parent Company (owner)
    - Capacity (MW)
    - Location/Zone (e.g., WEST Texas, COAST, NORTH)
    - TSP (e.g., ONCOR, CENTERPOINT, AEP)
@@ -367,7 +367,7 @@ Formato ejemplo:
    |---------|-----------|-----------|
 
 **IMPORTANTE: Al comparar PROYECTOS, SIEMPRE incluir estos atributos clave primero:**
-   - Developer (nombre de empresa)
+   - Empresa Matriz (propietario)
    - Capacidad (MW)
    - Ubicación/Zona (ej. WEST Texas, COAST, NORTH)
    - TSP (ej. ONCOR, CENTERPOINT, AEP)
@@ -412,7 +412,7 @@ Formato ejemplo:
 1. State the total count first (e.g., "There are X projects:")
 2. Present items as a numbered or bulleted list - EACH ITEM ONLY ONCE
 3. For each item, include key identifiers (name, INR, type)
-4. Group by category if applicable (by developer, technology, zone)
+4. Group by category if applicable (by parent company, technology, zone)
 5. Cite sources for each item
 IMPORTANT: Never list the same project/item multiple times. Deduplicate by project name/INR.""",
 
@@ -420,7 +420,7 @@ IMPORTANT: Never list the same project/item multiple times. Deduplicate by proje
 1. Indica el conteo total primero (ej: "Hay X proyectos:")
 2. Presenta elementos como lista numerada o con viñetas - CADA ELEMENTO SOLO UNA VEZ
 3. Para cada elemento, incluye identificadores clave (nombre, INR, tipo)
-4. Agrupa por categoría si aplica (por desarrollador, tecnología, zona)
+4. Agrupa por categoría si aplica (por empresa matriz, tecnología, zona)
 5. Cita fuentes para cada elemento
 IMPORTANTE: Nunca listes el mismo proyecto/elemento múltiples veces. Deduplica por nombre de proyecto/INR."""
     },
