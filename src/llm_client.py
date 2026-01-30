@@ -28,7 +28,7 @@ def call_llm_api(prompt_text: str) -> Generator[str, None, None]:
         "model": "llama3.1:8b",
         "prompt": prompt_text,
         "stream": True,
-        "max_tokens": 1024,      # Consensus: 500 too low, 2048 overkill
+        "max_tokens": 2048,      # Increased: 1024 was truncating comparative answers
         "temperature": 0.1       # Consensus: Low for factual RAG, not 0.0 (repetition risk)
     }
 
