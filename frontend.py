@@ -124,15 +124,13 @@ def _get_chain_version():
     except Exception:
         return "v1"
 
-# Cache key includes code version to invalidate cache when code changes
-_CHAIN_VERSION = _get_chain_version()
-
 @st.cache_resource
-def load_chain(k_docs: int, mode: str, with_summary: bool, _version: str = _CHAIN_VERSION):
+def load_chain(k_docs: int, mode: str, with_summary: bool, _version: str):
     """Load retriever + chain only once per process.
 
     Uses SmartRetriever for better filtering and boosting capabilities.
     Cache is invalidated when chain/components/filter code changes.
+    The _version parameter MUST be passed on each call (computed fresh).
     """
     retriever = get_smart_retriever(k_docs=k_docs)
     # Map string mode to Enum
@@ -314,7 +312,9 @@ with st.sidebar:
 # -------------------------
 # Load chain (cached)
 # -------------------------
-chain, retriever = load_chain(k_docs=k_docs, mode=selected_mode, with_summary=with_summary)
+# _get_chain_version() is called FRESH on each request to detect code changes
+chain, retriever = load_chain(k_docs=k_docs, mode=selected_mode, with_summary=with_summary,
+                               _version=_get_chain_version())
 
 # Session id for RunnableWithMessageHistory (src/chat_history.py)
 if "session_id" not in st.session_state:
