@@ -411,17 +411,19 @@ Formato ejemplo:
         "en": """RESPONSE FORMAT FOR LISTING QUESTION:
 1. State the total count first (e.g., "There are X projects:")
 2. Present items as a numbered or bulleted list - EACH ITEM ONLY ONCE
-3. For each item, include key identifiers (name, INR, type)
+3. For each item, include ALL provided details (name, INR, $/kW, company, capacity, zone, TSP)
 4. Group by category if applicable (by project company, technology, zone)
 5. Cite sources for each item
+IMPORTANT: Never say "no specific details available" if data IS provided in the context.
 IMPORTANT: Never list the same project/item multiple times. Deduplicate by project name/INR.""",
 
         "es": """FORMATO PARA PREGUNTA DE LISTADO:
 1. Indica el conteo total primero (ej: "Hay X proyectos:")
 2. Presenta elementos como lista numerada o con viñetas - CADA ELEMENTO SOLO UNA VEZ
-3. Para cada elemento, incluye identificadores clave (nombre, INR, tipo)
+3. Para cada elemento, incluye TODOS los detalles proporcionados (nombre, INR, $/kW, empresa, capacidad, zona, TSP)
 4. Agrupa por categoría si aplica (por empresa del proyecto, tecnología, zona)
 5. Cita fuentes para cada elemento
+IMPORTANTE: Nunca digas "sin detalles específicos" si los datos SÍ están en el contexto.
 IMPORTANTE: Nunca listes el mismo proyecto/elemento múltiples veces. Deduplica por nombre de proyecto/INR."""
     },
 

@@ -679,12 +679,16 @@ def execute_retrieval(
                 # Format as a prominent list with explicit instructions
                 threshold_list = f"""
 ================================================================================
-COMPLETE DATABASE QUERY RESULTS - AUTHORITATIVE LIST
+⚠️ AUTHORITATIVE DATABASE RESULTS - USE THIS DATA DIRECTLY ⚠️
 ================================================================================
 ## ALL {len(threshold_projects)} PROJECTS WITH SECURITY >= ${security_threshold}/kW
 
-**IMPORTANT INSTRUCTION:** Your response MUST list ALL {len(threshold_projects)} projects shown below.
-Do NOT say "there are X projects" and then list fewer. List ALL of them.
+**CRITICAL INSTRUCTIONS:**
+1. Your response MUST list ALL {len(threshold_projects)} projects shown below
+2. USE THE EXACT DATA PROVIDED HERE - project name, INR, $/kW, company, capacity, zone, TSP
+3. Do NOT say "no specific details available" - ALL details are provided below
+4. Do NOT look for additional details in other sources - this list IS complete
+5. Simply COPY the data from each project entry into your response
 
 """
                 for i, proj in enumerate(threshold_projects, 1):
