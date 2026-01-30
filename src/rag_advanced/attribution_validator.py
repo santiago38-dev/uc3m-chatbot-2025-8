@@ -181,8 +181,8 @@ ATTRIBUTION_PATTERNS = [
     # Table rows: "| RWE | Champaign BESS |"
     r"\|\s*([A-Za-z\s&]+?)\s*\|\s*([A-Za-z0-9\s]+(?:BESS|Solar|Wind|Storage))\s*\|",
 
-    # "Developer: RWE" or "Parent Company: RWE" followed by "Project: Champaign BESS"
-    r"(?:Developer|Parent Company):\s*([A-Za-z\s&]+?)\s*(?:\||,|\n)[^\n]*?Project[:\s]+([A-Za-z0-9\s]+)",
+    # "Developer: RWE" or "Project Company: RWE" followed by "Project: Champaign BESS"
+    r"(?:Developer|Project Company):\s*([A-Za-z\s&]+?)\s*(?:\||,|\n)[^\n]*?Project[:\s]+([A-Za-z0-9\s]+)",
 
     # "RWE projects include Champaign BESS"
     r"([A-Za-z\s&]+?)\s+projects?\s+(?:include|are|:)\s*([A-Za-z0-9\s,]+(?:BESS|Solar|Wind|Storage))",
@@ -383,6 +383,6 @@ def create_grounding_context(docs: List[Document]) -> str:
         lines.append(f"- {project.title()}: owned by {canonical}")
 
     lines.append("")
-    lines.append("IMPORTANT: Only attribute projects to parent companies listed above.")
+    lines.append("IMPORTANT: Only attribute projects to project companies listed above.")
 
     return "\n".join(lines)

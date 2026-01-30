@@ -60,7 +60,7 @@ RESPONSE FORMAT:
 
 MULTI-DOCUMENT ANALYSIS:
 - If the question requires aggregation (averages, comparisons, trends), synthesize data from ALL relevant sources
-- For comparative questions, clearly organize findings by: Parent Company, Technology (SOL/WIN/OTH/GAS), Time Period, or Zone
+- For comparative questions, clearly organize findings by: Project Company, Technology (SOL/WIN/OTH/GAS), Time Period, or Zone
 - Identify patterns across multiple SGIAs when answering trend questions
 
 RULES:
@@ -75,7 +75,7 @@ RULES:
 DATA EXTRACTION - BE THOROUGH:
 - Read the FULL content of each [Source N] block, not just the headers
 - Look for data in tables, lists, and paragraph text
-- Project details like Parent Company, Location, Capacity, and Security are often in the document body, not just headers
+- Project details like Project Company, Location, Capacity, and Security are often in the document body, not just headers
 - If the question asks about specific fields, search for those exact terms in the source text
 
 THRESHOLD VALIDATION (CRITICAL for questions with numeric criteria):
@@ -190,7 +190,7 @@ FORMATO DE RESPUESTA:
 
 ANÁLISIS MULTI-DOCUMENTO:
 - Si la pregunta requiere agregación (promedios, comparaciones, tendencias), sintetiza datos de TODAS las fuentes relevantes
-- Para preguntas comparativas, organiza hallazgos por: Empresa Matriz, Tecnología (SOL/WIN/OTH/GAS), Período, o Zona
+- Para preguntas comparativas, organiza hallazgos por: Empresa del Proyecto, Tecnología (SOL/WIN/OTH/GAS), Período, o Zona
 - Identifica patrones entre múltiples SGIAs al responder preguntas de tendencias
 
 REGLAS:
@@ -205,7 +205,7 @@ REGLAS:
 EXTRACCIÓN DE DATOS - SÉ MINUCIOSO:
 - Lee el contenido COMPLETO de cada bloque [Fuente N], no solo los encabezados
 - Busca datos en tablas, listas y texto de párrafos
-- Detalles del proyecto como Empresa Matriz, Ubicación, Capacidad y Garantía a menudo están en el cuerpo del documento, no solo en encabezados
+- Detalles del proyecto como Empresa del Proyecto, Ubicación, Capacidad y Garantía a menudo están en el cuerpo del documento, no solo en encabezados
 - Si la pregunta pide campos específicos, busca esos términos exactos en el texto fuente
 
 VALIDACIÓN DE UMBRALES (CRÍTICO para preguntas con criterios numéricos):
@@ -351,7 +351,7 @@ Formato ejemplo:
    |--------|----------|----------|
 
 **IMPORTANT: When comparing PROJECTS, ALWAYS include these key attributes first:**
-   - Parent Company (owner)
+   - Project Company (owner)
    - Capacity (MW)
    - Location/Zone (e.g., WEST Texas, COAST, NORTH)
    - TSP (e.g., ONCOR, CENTERPOINT, AEP)
@@ -367,7 +367,7 @@ Formato ejemplo:
    |---------|-----------|-----------|
 
 **IMPORTANTE: Al comparar PROYECTOS, SIEMPRE incluir estos atributos clave primero:**
-   - Empresa Matriz (propietario)
+   - Empresa del Proyecto (propietario)
    - Capacidad (MW)
    - Ubicación/Zona (ej. WEST Texas, COAST, NORTH)
    - TSP (ej. ONCOR, CENTERPOINT, AEP)
@@ -412,7 +412,7 @@ Formato ejemplo:
 1. State the total count first (e.g., "There are X projects:")
 2. Present items as a numbered or bulleted list - EACH ITEM ONLY ONCE
 3. For each item, include key identifiers (name, INR, type)
-4. Group by category if applicable (by parent company, technology, zone)
+4. Group by category if applicable (by project company, technology, zone)
 5. Cite sources for each item
 IMPORTANT: Never list the same project/item multiple times. Deduplicate by project name/INR.""",
 
@@ -420,7 +420,7 @@ IMPORTANT: Never list the same project/item multiple times. Deduplicate by proje
 1. Indica el conteo total primero (ej: "Hay X proyectos:")
 2. Presenta elementos como lista numerada o con viñetas - CADA ELEMENTO SOLO UNA VEZ
 3. Para cada elemento, incluye identificadores clave (nombre, INR, tipo)
-4. Agrupa por categoría si aplica (por empresa matriz, tecnología, zona)
+4. Agrupa por categoría si aplica (por empresa del proyecto, tecnología, zona)
 5. Cita fuentes para cada elemento
 IMPORTANTE: Nunca listes el mismo proyecto/elemento múltiples veces. Deduplica por nombre de proyecto/INR."""
     },

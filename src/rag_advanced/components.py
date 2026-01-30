@@ -1151,7 +1151,7 @@ Do NOT say "there are X projects" and then list fewer. List ALL of them.
                     cap_val = proj.get('capacity_mw', 'N/A')
                     cap_str = f"{cap_val:.1f} MW" if isinstance(cap_val, (int, float)) else str(cap_val)
                     threshold_list += f"{i}. **{proj['project_name']}** ({proj['inr']}) - {sec_str}\n"
-                    threshold_list += f"   Parent Company: {proj['developer']} | Capacity: {cap_str} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n\n"
+                    threshold_list += f"   Project Company: {proj['developer']} | Capacity: {cap_str} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n\n"
                 threshold_list += "================================================================================\n"
                 # Prepend threshold list to context (BEFORE other content)
                 context = f"{threshold_list}\n{context}"
