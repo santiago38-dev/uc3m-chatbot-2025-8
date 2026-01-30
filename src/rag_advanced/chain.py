@@ -223,7 +223,7 @@ def format_developer_stats(dev_analysis: Dict) -> str:
     # New format: {dev: [zone_list]} or Old format: {dev: {project_count, zones}}
     multi_zone = dev_analysis.get("multi_zone_developers", {})
     if multi_zone:
-        lines.append("**Multi-Zone Developers:**")
+        lines.append("**Multi-Zone Parent Companies:**")
         for dev, data in list(multi_zone.items())[:5]:
             if isinstance(data, list):
                 # New format: data is list of zones
@@ -305,7 +305,7 @@ def get_analytics_context(analytics: Dict) -> str:
     # Developer analysis
     dev_analysis = analytics.get("developer_analysis", {})
     if dev_analysis:
-        lines.append("\n### DEVELOPER ANALYSIS")
+        lines.append("\n### PARENT COMPANY ANALYSIS")
         lines.append(format_developer_stats(dev_analysis))
 
     # Specific developer sections - handles both old format and new "specific_developers" format
@@ -693,7 +693,7 @@ Do NOT say "there are X projects" and then list fewer. List ALL of them.
                     cap_val = proj.get('capacity_mw', 'N/A')
                     cap_str = f"{cap_val:.1f} MW" if isinstance(cap_val, (int, float)) else str(cap_val)
                     threshold_list += f"{i}. **{proj['project_name']}** ({proj['inr']}) - {sec_str}\n"
-                    threshold_list += f"   Developer: {proj['developer']} | Capacity: {cap_str} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n\n"
+                    threshold_list += f"   Parent Company: {proj['developer']} | Capacity: {cap_str} | Zone: {proj['zone']} | TSP: {proj['tsp']}\n\n"
                 threshold_list += "================================================================================\n"
                 # Prepend threshold list to context (BEFORE other content)
                 context = f"{threshold_list}\n{context}"
